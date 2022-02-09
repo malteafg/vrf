@@ -1,3 +1,8 @@
-ecvrf/target/
 rsa/target/
+rsa/Cargo.lock
 rsa-fdh-vrf/target/
+rsa-fdh-vrf/Cargo.lock
+ecvrf/target/
+ecvrf/Cargo.lock
+target/
+Cargo.lock
