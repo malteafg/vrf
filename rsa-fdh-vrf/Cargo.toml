@@ -10,3 +10,8 @@ path = "src/rsa-fdh-vrf.rs"
 
 [dependencies]
 hacspec-lib = { path = "../../hacspec/lib"}
+rsa = { path = "../rsa"}
+
+[dev-dependencies]
+quickcheck = "1"
+quickcheck_macros = "1"

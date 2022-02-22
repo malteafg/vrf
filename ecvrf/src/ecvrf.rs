@@ -1,8 +1,17 @@
+use hacspec_lib::*;
+
+#[cfg(test)]
+extern crate quickcheck;
+
+#[cfg(test)]
+#[macro_use(quickcheck)]
+extern crate quickcheck_macros;
+
+#[cfg(test)]
+use quickcheck::*;
+
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn it_works() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
-    }
+    use super::*;
+
 }

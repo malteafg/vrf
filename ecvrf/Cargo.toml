@@ -10,3 +10,7 @@ path = "src/ecvrf.rs"
 
 [dependencies]
 hacspec-lib = { path = "../../hacspec/lib" }
+
+[dev-dependencies]
+quickcheck = "1"
+quickcheck_macros = "1"
