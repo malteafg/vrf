@@ -10,6 +10,7 @@ path = "src/rsa.rs"
 
 [dependencies]
 hacspec-lib = { path = "../../hacspec/lib" }
+hacspec-sha256 = { path = "../../hacspec/examples/sha256" }
 
 [dev-dependencies]
 quickcheck = "1"
