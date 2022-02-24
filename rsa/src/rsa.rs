@@ -31,22 +31,22 @@ pub fn mgf1(mgf_seed: &ByteSeq, mask_len: usize) -> ByteSeq {
 
 pub fn rsaep(pk: PK, m: RSAInt) -> RSAInt {
     // TODO check that message is smaller than n
-    m.pow_felem(pk.0, pk.1)
+    m.pow_mod(pk.0, pk.1)
 }
 
 pub fn rsadp(sk: SK, c: RSAInt) -> RSAInt {
     // TODO check that ciphertext is smaller than n
-    c.pow_felem(sk.0, sk.1)
+    c.pow_mod(sk.0, sk.1)
 }
 
 pub fn rsasp1(sk: SK, m: RSAInt) -> RSAInt {
     // TODO check that message is smaller than n
-    m.pow_felem(sk.0, sk.1)
+    m.pow_mod(sk.0, sk.1)
 }
 
 pub fn rsavp1(pk: PK, s: RSAInt) -> RSAInt {
     // TODO check that signature is smaller than n
-    s.pow_felem(pk.0, pk.1)
+    s.pow_mod(pk.0, pk.1)
 }
 
 #[cfg(test)]
