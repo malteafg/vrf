@@ -52,5 +52,4 @@ use quickcheck::*;
 #[cfg(test)]
 mod tests {
     use super::*;
-
 }

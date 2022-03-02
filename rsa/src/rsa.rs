@@ -1,8 +1,8 @@
 use hacspec_lib::*;
 use hacspec_sha256::*;
 
-const BIT_SIZE: u32  = 1024u32;
-const BYTE_SIZE: u32 = 127u32;
+pub const BIT_SIZE: u32  = 1024u32;
+pub const BYTE_SIZE: u32 = 127u32;
 const HLEN: usize = 32usize; // sha256 / 8 = 32
 unsigned_public_integer!(RSAInt, 1024);
 
@@ -103,6 +103,17 @@ use glass_pumpkin::prime;
 use quickcheck::*;
 
 #[cfg(test)]
+impl Arbitrary for RSAInt {
+    fn arbitrary(g: &mut Gen) -> RSAInt {
+        let mut a: [u8; BYTE_SIZE as usize] = [0; BYTE_SIZE as usize];
+        for i in 0..BYTE_SIZE as usize {
+            a[i] = u8::arbitrary(g);
+        }
+        RSAInt::from_byte_seq_be(&Seq::<U8>::from_public_slice(&a))
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -133,16 +144,6 @@ mod tests {
         ((n, RSAInt::from(e)), (n, RSAInt::from(d)))
     }
 
-    impl Arbitrary for RSAInt {
-        fn arbitrary(g: &mut Gen) -> RSAInt {
-            let mut a: [u8; BYTE_SIZE as usize] = [0; BYTE_SIZE as usize];
-            for i in 0..BYTE_SIZE as usize {
-                a[i] = u8::arbitrary(g);
-            }
-            RSAInt::from_byte_seq_be(&Seq::<U8>::from_public_slice(&a))
-        }
-    }
-
     #[derive(Clone, Copy, Debug)]
     struct Keyp {n: RSAInt, d: RSAInt, e: RSAInt}
 
@@ -161,7 +162,7 @@ mod tests {
         }
     }
 
-    #[quickcheck]
+    //#[quickcheck]
     fn rsaeprsadp(x: RSAInt, kp: Keyp) -> bool {
         match rsaep((kp.n, kp.e), x) {
             Ok(i) => 
@@ -173,7 +174,7 @@ mod tests {
         }
     }
 
-    #[quickcheck]
+    //#[quickcheck]
     fn rsasp1rsavp1(x: RSAInt, kp: Keyp) -> bool {
         match rsasp1((kp.n, kp.d), x) {
             Ok(i) => 
@@ -185,6 +186,53 @@ mod tests {
         }
     }
 
+    //#[quickcheck]
+    fn neg_rsaeprsadp(x: RSAInt, y: RSAInt, kp: Keyp) -> bool {
+        match rsaep((kp.n, kp.e), x) {
+            Ok(_i) => 
+                match rsadp((kp.n, kp.d), y) {
+                    Ok(i) => i != x,
+                    Err(_e) => panic!(),
+                }
+            Err(_e) => panic!(),
+        }
+    }
+
+    //#[quickcheck]
+    fn neg_rsasp1rsavp1(x: RSAInt, y: RSAInt, kp: Keyp) -> bool {
+        match rsasp1((kp.n, kp.d), x) {
+            Ok(_i) => 
+                match rsavp1((kp.n, kp.e), y) {
+                    Ok(i) => i != x,
+                    Err(_e) => panic!(),
+                }
+            Err(_e) => panic!(),
+        }
+    }
+
+    #[quickcheck]
+    fn negkey_rsaeprsadp(x: RSAInt, kp: Keyp, fake: Keyp) -> bool {
+        match rsaep((kp.n, kp.e), x) {
+            Ok(_i) => 
+                match rsadp((fake.n, fake.d), x) {
+                    Ok(i) => i != x,
+                    Err(_e) => panic!(),
+                }
+            Err(_e) => panic!(),
+        }
+    }
+
+    #[quickcheck]
+    fn negkey_rsasp1rsavp1(x: RSAInt, kp: Keyp, fake: Keyp) -> bool {
+        match rsasp1((kp.n, kp.d), x) {
+            Ok(_i) => 
+                match rsavp1((fake.n, fake.e), x) {
+                    Ok(i) => i != x,
+                    Err(_e) => panic!(),
+                }
+            Err(_e) => panic!(),
+        }
+    }
     #[test]
     fn uniti2os2i() {
         let x = RSAInt::from_literal(12341234);
