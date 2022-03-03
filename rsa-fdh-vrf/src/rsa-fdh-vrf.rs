@@ -6,6 +6,7 @@ use hacspec_sha256::*;
 pub const BIT_SIZE: u32  = 1024u32;
 pub const BYTE_SIZE: u32 = 127u32;
 const HLEN: usize = 32usize; // sha256 / 8 = 32
+// const suite_string: ByteSeq = ByteSeq::from_hex("01");
 unsigned_public_integer!(RSAInt, 1024);
 
 pub enum Error {
@@ -94,11 +95,12 @@ pub fn rsavp1(pk: PK, s: RSAInt) -> RSAIntResult {
 // Output: pi_string proof that beta was calculated correctly
 pub fn prove(sk: SK, alpha: &ByteSeq) -> ByteSeqResult {
     let (n, _d) = sk;
+    let suite_string = ByteSeq::from_hex("01");
+
     // STEP 1
     let mgf_domain_separator = ByteSeq::from_hex("01");
 
     // STEP 2
-    let suite_string = ByteSeq::from_hex("01");
     let mgf_salt1 = i2osp(RSAInt::from_literal(4), BYTE_SIZE)?;
     let mgf_salt2 = i2osp(n, BYTE_SIZE)?;
     let mgf_salt = mgf_salt1.concat(&mgf_salt2);
@@ -118,12 +120,23 @@ pub fn prove(sk: SK, alpha: &ByteSeq) -> ByteSeqResult {
     i2osp(s, BYTE_SIZE)
 }
 
-// Input: pi_string calculated in prove
+// Input: pi_string calculated in prove, or from verify
 // Output: beta_string
 pub fn proof_to_hash(pi_string: &ByteSeq) -> ByteSeq {
+    let suite_string = ByteSeq::from_hex("01");
+
+    // STEP 1
     let proof_to_hash_domain_separator = ByteSeq::from_hex("02");
-    let sha_digest = sha256(&proof_to_hash_domain_separator.concat(pi_string));
+
+    // STEP 2
+    let hash_string = suite_string
+        .concat(&proof_to_hash_domain_separator
+        .concat(pi_string));
+    let sha_digest = sha256(&hash_string);
+
+    // STEP 3
     // TODO this is stupid
+    // sha256(&hash_string)
     let empty = ByteSeq::new(0);
     empty.concat(&sha_digest)
 }
