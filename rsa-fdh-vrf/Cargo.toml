@@ -16,3 +16,5 @@ hacspec-sha256 = { path = "../../hacspec/examples/sha256" }
 [dev-dependencies]
 quickcheck = "1"
 quickcheck_macros = "1"
+glass_pumpkin = "1.0"
+num-bigint="0.4.3"
