@@ -4,7 +4,7 @@ use hacspec_sha256::*;
 // RSA =========================================================================
 
 pub const BIT_SIZE: u32  = 1024u32;
-pub const BYTE_SIZE: u32 = 127u32;
+pub const BYTE_SIZE: u32 = 1024u32 / 8u32;
 const HLEN: usize = 32usize; // sha256 / 8 = 32
 // const suite_string: ByteSeq = ByteSeq::from_hex("01");
 unsigned_public_integer!(RSAInt, 1024);
@@ -27,7 +27,7 @@ pub fn i2osp(x: RSAInt, x_len: u32) -> ByteSeqResult {
         ByteSeqResult::Err(Error::InvalidLength)
     } else {
         ByteSeqResult::Ok(RSAInt::to_byte_seq_be(x)
-            .slice((BIT_SIZE / 8u32 - x_len) as usize, x_len as usize))
+            .slice((BYTE_SIZE - x_len) as usize, x_len as usize))
     }
 }
 
@@ -89,14 +89,11 @@ pub fn rsavp1(pk: PK, s: RSAInt) -> RSAIntResult {
 
 // VRF stuff ===================================================================
 
-pub fn rsa_fdh_vrf_mgf1(n: RSAInt, alpha: &ByteSeq) -> ByteSeqResult {
-    let alpha_int = os2ip(alpha);
-    println!("n: {}, alpha {}", n, alpha_int);
-
+fn rsa_fdh_vrf_mgf1(n: RSAInt, alpha: &ByteSeq) -> ByteSeqResult {
     let suite_string = i2osp(RSAInt::from_literal(1u128), 1u32)?;
     let mgf_domain_separator = i2osp(RSAInt::from_literal(1u128), 1u32)?;
 
-    let mgf_salt1 = i2osp(RSAInt::from_literal(4u128), BYTE_SIZE)?;
+    let mgf_salt1 = i2osp(RSAInt::from_literal(4u128), 1u32)?;
     let mgf_salt2 = i2osp(n, BYTE_SIZE)?;
     let mgf_salt = mgf_salt1.concat(&mgf_salt2);
     let mgf_string = suite_string
@@ -104,8 +101,6 @@ pub fn rsa_fdh_vrf_mgf1(n: RSAInt, alpha: &ByteSeq) -> ByteSeqResult {
         .concat(&mgf_salt
         .concat(alpha)));
     let mgf = mgf1(&mgf_string, BYTE_SIZE as usize - 1usize)?;
-    let mgf_int = os2ip(&mgf);
-    println!("mgf: {}", mgf_int);
     ByteSeqResult::Ok(mgf)
 }
 
@@ -115,27 +110,12 @@ pub fn rsa_fdh_vrf_mgf1(n: RSAInt, alpha: &ByteSeq) -> ByteSeqResult {
 // Output: pi_string proof that beta was calculated correctly
 pub fn prove(sk: SK, alpha: &ByteSeq) -> ByteSeqResult {
     let (n, _d) = sk;
-    // let suite_string = i2osp(RSAInt::from_literal(1u128), 1u32)?;
 
-    // // STEP 1
-    // // let mgf_domain_separator = ByteSeq::from_hex("01");
-    // let mgf_domain_separator = i2osp(RSAInt::from_literal(1u128), 1u32)?;
-
-    // // STEP 2
-    // let mgf_salt1 = i2osp(RSAInt::from_literal(4u128), BYTE_SIZE)?;
-    // let mgf_salt2 = i2osp(n, BYTE_SIZE)?;
-    // let mgf_salt = mgf_salt1.concat(&mgf_salt2);
-    // let mgf_string = suite_string
-    //     .concat(&mgf_domain_separator
-    //     .concat(&mgf_salt
-    //     .concat(alpha)));
-    // let em = mgf1(&mgf_string, BYTE_SIZE as usize - 1usize)?;
-
+    // STEP 1 and 2
     let em = rsa_fdh_vrf_mgf1(n, alpha)?;
 
     // STEP 3
     let m = os2ip(&em);
-    println!("m: {}", m);
 
     // STEP 4
     let s = rsasp1(sk, m)?;
@@ -169,8 +149,6 @@ pub fn proof_to_hash(pi_string: &ByteSeq) -> ByteSeqResult {
 // Input: Private Key, alpha_string, pi_string
 // Output: Verified beta string
 pub fn verify(pk: PK, alpha: &ByteSeq, pi_string: &ByteSeq) -> ByteSeqResult {
-    let suite_string = i2osp(RSAInt::from_literal(1u128), 1u32)?;
-    println!("1");
     let (n, _e) = pk;
 
     // STEP 1
@@ -178,28 +156,8 @@ pub fn verify(pk: PK, alpha: &ByteSeq, pi_string: &ByteSeq) -> ByteSeqResult {
 
     // STEP 2, TODO: maybe output 'INVALID'??
     let m = rsavp1(pk, s)?;
-    println!("m verified: {}", m);
-    let alpha_int = os2ip(alpha);
-    // println!("{}, {}", m, alpha_int);
-    println!("2");
 
-    // // STEP 3
-    // // let mgf_domain_separator = ByteSeq::from_hex("01");
-    // let mgf_domain_separator = i2osp(RSAInt::from_literal(1u128), 1u32)?;
-    // println!("3");
-
-    // // STEP 4
-    // let mgf_salt1 = i2osp(RSAInt::from_literal(4u128), BYTE_SIZE)?;
-    // println!("4");
-    // let mgf_salt2 = i2osp(n, BYTE_SIZE)?;
-    // println!("5");
-    // let mgf_salt = mgf_salt1.concat(&mgf_salt2);
-    // let mgf_string = suite_string
-    //     .concat(&mgf_domain_separator
-    //     .concat(&mgf_salt
-    //     .concat(alpha)));
-    // let em_prime = mgf1(&mgf_string, BYTE_SIZE as usize - 1usize)?;
-    // println!("6");
+    // STEP 3 and 4
     let em_prime = rsa_fdh_vrf_mgf1(n, alpha)?;
 
     // STEP 5
@@ -207,13 +165,10 @@ pub fn verify(pk: PK, alpha: &ByteSeq, pi_string: &ByteSeq) -> ByteSeqResult {
 
     // STEP 6
     let mut result = ByteSeqResult::Ok(ByteSeq::new(0));
-    // println!("{}, {}", m, m_prime);
     if m == m_prime {
         let output = proof_to_hash(pi_string)?;
-        println!("7");
         result = ByteSeqResult::Ok(output)
     } else {
-        println!("7.1");
         result = ByteSeqResult::Err(Error::InvalidProof)
     }
     result
@@ -249,7 +204,8 @@ mod tests {
     // Taken from https://asecuritysite.com/rust/rsa01/ 
     fn modinv(a0: BigInt, m0: BigInt) -> BigInt {
         if m0 == one() {return one()}
-        let (mut a, mut m, mut x0, mut inv) = (a0, m0.clone(), zero(), one());
+        let (mut a, mut m, mut x0, mut inv) = 
+            (a0, m0.clone(), zero(), one());
         while a > one() {
             inv -= (&a / &m) * &x0;
             a = &a % &m;
@@ -261,8 +217,10 @@ mod tests {
     }
 
     fn rsa_key_gen() -> KeyPair {
-        let p = BigInt::from_biguint(Sign::Plus,prime::new((BIT_SIZE / 2) as usize).unwrap());
-        let q = BigInt::from_biguint(Sign::Plus,prime::new((BIT_SIZE / 2) as usize).unwrap());
+        let p = BigInt::from_biguint(Sign::Plus,
+            prime::new((BIT_SIZE / 2) as usize).unwrap());
+        let q = BigInt::from_biguint(Sign::Plus,
+            prime::new((BIT_SIZE / 2) as usize).unwrap());
 
         let n = RSAInt::from(p.clone()* q.clone());
 
@@ -279,8 +237,9 @@ mod tests {
 
     impl Arbitrary for RSAInt {
         fn arbitrary(g: &mut Gen) -> RSAInt {
-            let mut a: [u8; BYTE_SIZE as usize] = [0; BYTE_SIZE as usize];
-            for i in 0..BYTE_SIZE as usize {
+            const NUM_BYTES: u32 = 127;
+            let mut a: [u8; NUM_BYTES as usize] = [0; NUM_BYTES as usize];
+            for i in 0..NUM_BYTES as usize {
                 a[i] = u8::arbitrary(g);
             }
             RSAInt::from_byte_seq_be(&Seq::<U8>::from_public_slice(&a))
@@ -297,7 +256,7 @@ mod tests {
 // RSA TESTS ===================================================================
     #[quickcheck]
     fn i2os2i(x: RSAInt) -> bool {
-        match i2osp(x, BYTE_SIZE) {
+        match i2osp(x, 128) {
             Ok(i) => x == os2ip(&i),
             Err(_e) => panic!(),
         }
@@ -428,9 +387,9 @@ mod tests {
     }
 
     #[test]
-    fn unitmgf1() {
+    fn unitrsasp1rsavp1_large_num() {
         let (pk, sk) = rsa_key_gen();
-        let x = os2ip(&ByteSeq::from_hex("abcdef"));
+        let x = os2ip(&ByteSeq::from_hex("fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0"));
         match rsasp1(sk, x) {
             Ok(i) => 
                 match rsavp1(pk, i) {
@@ -443,6 +402,29 @@ mod tests {
 
 // VRF TESTS ===================================================================
 
+    #[quickcheck]
+    #[ignore]
+    fn rsafhdvrf(kp: Keyp, alpha: RSAInt) -> bool {
+        match i2osp(alpha, BYTE_SIZE) {
+            Ok(alpha) => {
+                match prove((kp.n, kp.d), &alpha) {
+                    Ok(pi) => {
+                        match proof_to_hash(&pi) {
+                            Ok(beta) => {
+                                match verify((kp.n, kp.e), &alpha, &pi) {
+                                    Ok(beta_v) => beta == beta_v,
+                                    Err(_e) => panic!(),
+                                }
+                            },
+                            Err(_e) => panic!(),
+                        }
+                    }
+                    Err(_e) => panic!(),
+                }
+            }
+            Err(_e) => panic!(),
+        }
+    }
     #[test]
     fn unitrsafhdvrf() {
         let (pk, sk) = rsa_key_gen();
