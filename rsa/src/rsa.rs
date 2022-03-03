@@ -23,7 +23,7 @@ pub fn i2osp(x: RSAInt, x_len: u32) -> ByteSeqResult {
         ByteSeqResult::Err(Error::InvalidLength)
     } else {
         ByteSeqResult::Ok(RSAInt::to_byte_seq_be(x)
-            .slice((BIT_SIZE / 8 - x_len) as usize, x_len as usize))
+            .slice((BIT_SIZE / 8u32 - x_len) as usize, x_len as usize))
     }
 }
 
@@ -38,8 +38,7 @@ pub fn mgf1(mgf_seed: &ByteSeq, mask_len: usize) -> ByteSeqResult {
     } else {
         let mut t = ByteSeq::new(0);
         for i in 0..((mask_len + 32 - 1) / 32 - 1) {
-            let x = i2osp(RSAInt::from_literal(
-                i as u128), 4u32)?;
+            let x = i2osp(RSAInt::from_literal(i as u128), 4u32)?;
             t = t.concat(&sha256(&mgf_seed.concat(&x)));
         }
         result = ByteSeqResult::Ok(t.slice(0, mask_len))
@@ -162,7 +161,7 @@ mod tests {
         }
     }
 
-    //#[quickcheck]
+    #[quickcheck]
     fn rsaeprsadp(x: RSAInt, kp: Keyp) -> bool {
         match rsaep((kp.n, kp.e), x) {
             Ok(i) => 
@@ -174,7 +173,7 @@ mod tests {
         }
     }
 
-    //#[quickcheck]
+    #[quickcheck]
     fn rsasp1rsavp1(x: RSAInt, kp: Keyp) -> bool {
         match rsasp1((kp.n, kp.d), x) {
             Ok(i) => 
@@ -186,7 +185,7 @@ mod tests {
         }
     }
 
-    //#[quickcheck]
+    #[quickcheck]
     fn neg_rsaeprsadp(x: RSAInt, y: RSAInt, kp: Keyp) -> bool {
         match rsaep((kp.n, kp.e), x) {
             Ok(_i) => 
@@ -198,7 +197,7 @@ mod tests {
         }
     }
 
-    //#[quickcheck]
+    #[quickcheck]
     fn neg_rsasp1rsavp1(x: RSAInt, y: RSAInt, kp: Keyp) -> bool {
         match rsasp1((kp.n, kp.d), x) {
             Ok(_i) => 

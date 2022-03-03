@@ -9,7 +9,7 @@ edition = "2021"
 path = "src/rsa-fdh-vrf.rs"
 
 [dependencies]
-hacspec-lib = { path = "../../hacspec/lib"}
+hacspec-lib = { path = "../../hacspec/lib" }
 rsa = { path = "../rsa"}
 hacspec-sha256 = { path = "../../hacspec/examples/sha256" }
 
