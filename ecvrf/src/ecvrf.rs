@@ -50,7 +50,7 @@ fn ecvrf_encode_to_curve(
             .concat(alpha)
             .concat(&ctr_string)
             .concat(&encode_to_curve_domain_separator_back));
-        let h = decompress(&hash_string);
+        // let h = decompress(&hash_string);
         
     }
     panic!()
