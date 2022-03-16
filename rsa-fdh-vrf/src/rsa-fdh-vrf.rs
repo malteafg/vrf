@@ -130,7 +130,8 @@ pub fn proof_to_hash(pi_string: &ByteSeq) -> ByteSeqResult {
     let suite_string = i2osp(RSAInt::from_literal(1u128), 1u32)?;
 
     // STEP 1
-    let proof_to_hash_domain_separator = i2osp(RSAInt::from_literal(2u128), 1u32)?;
+    let proof_to_hash_domain_separator = i2osp(
+        RSAInt::from_literal(2u128), 1u32)?;
 
     // STEP 2
     let hash_string = suite_string
