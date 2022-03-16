@@ -10,8 +10,9 @@ const J: u128 = 486662;
 const K: u128 = 1;
 const Z: u128 = 2;
 
-array!(ArrEd25519FieldElement, 6, U64);
+array!(ArrEd25519FieldElement, 4, U64);
 
+// TODO should these be in little endian?
 // (p - 1) / 2
 const P_1_2: ArrEd25519FieldElement = ArrEd25519FieldElement(secret_array!(
     U64,
@@ -20,17 +21,6 @@ const P_1_2: ArrEd25519FieldElement = ArrEd25519FieldElement(secret_array!(
         0xffffffffffffffffu64,
         0xffffffffffffffffu64,
         0xfffffffffffffff6u64
-    ]
-));
-
-// (p + 1) / 4
-const P_1_4: ArrEd25519FieldElement = ArrEd25519FieldElement(secret_array!(
-    U64,
-    [
-        0x1fffffffffffffffu64,
-        0xffffffffffffffffu64,
-        0xffffffffffffffffu64,
-        0xfffffffffffffffbu64
     ]
 ));
 
@@ -93,6 +83,11 @@ fn ed_sgn0(x: Ed25519FieldElement) -> bool {
     x % Ed25519FieldElement::TWO() == Ed25519FieldElement::ONE()
 }
 
+// taken from bls12-381-hash.rs
+fn ed_clear_cofactor(x: EdPoint) -> EdPoint {
+    point_mul_by_cofactor(x)
+}
+
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#section-6.7.1
 // TODO check exceptional case defined in 6.7.1 probably not needed as q=5(mod 8)
 // TODO k is equal to one
@@ -131,10 +126,36 @@ fn map_to_curve_elligator2(u: Ed25519FieldElement) -> Point {
     X25519FieldElement::from_byte_seq_le(t.to_byte_seq_le()))
 }
 
+fn monty_to_edw(p: Point) -> EdPoint {
+    let (s,t) = p;
+    let one = X25519FieldElement::ONE();
+    let zero = X25519FieldElement::ZERO();
+
+    let tv1 = s + one;
+    let tv2 = tv1 * t;
+    let tv2 = tv2.inv();
+    let v = tv2 * tv1;
+    let v = v * s;
+    let w = tv2 * t;
+    let tv1 = s - one;
+    let mut w = w * tv1;
+    let e = tv2 == zero;
+    // TODO check if this is constant time implementation
+    if e {
+        w = one
+    }
+    
+    (Ed25519FieldElement::from_byte_seq_le(v.to_byte_seq_le()),
+    Ed25519FieldElement::from_byte_seq_le(w.to_byte_seq_le()),
+    Ed25519FieldElement::from_byte_seq_le(one.to_byte_seq_le()),
+    Ed25519FieldElement::from_byte_seq_le((v * w).to_byte_seq_le()))
+}
+
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#section-6.8.2
 fn map_to_curve_elligator2_edwards(u: Ed25519FieldElement) -> EdPoint {
     let st = map_to_curve_elligator2(u);
-    rational_map(st)
+    // monty_to_edw gives the extended homogeneous coordinates
+    monty_to_edw(st)
 }
 
 //  https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#section-3
@@ -142,7 +163,7 @@ pub fn ed_hash_to_curve(msg: &ByteSeq, dst: &ByteSeq) -> EdPoint {
     let u = ed_hash_to_field(msg, dst, 2);
     let q0 = map_to_curve_elligator2_edwards(u[0]);
     let q1 = map_to_curve_elligator2_edwards(u[1]);
-    let r = g1add(q0, q1);
-    let p = g1_clear_cofactor(r);
+    let r = point_add(q0, q1);
+    let p = ed_clear_cofactor(r);
     p
 }

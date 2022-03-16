@@ -53,7 +53,7 @@ pub fn mgf1(mgf_seed: &ByteSeq, mask_len: usize) -> ByteSeqResult {
 
 pub fn rsaep(pk: PK, m: RSAInt) -> RSAIntResult {
     let (n, e) = pk;
-    if m > n - RSAInt::from_literal(1u128) {
+    if m > n - RSAInt::ONE() {
         RSAIntResult::Err(Error::MessageTooLarge)
     } else {
         RSAIntResult::Ok(m.pow_mod(e, n))
@@ -62,7 +62,7 @@ pub fn rsaep(pk: PK, m: RSAInt) -> RSAIntResult {
 
 pub fn rsadp(sk: SK, c: RSAInt) -> RSAIntResult {
     let (n, d) = sk;
-    if c > n - RSAInt::from_literal(1u128) {
+    if c > n - RSAInt::ONE() {
         RSAIntResult::Err(Error::MessageTooLarge)
     } else {
         RSAIntResult::Ok(c.pow_mod(d, n))
@@ -71,7 +71,7 @@ pub fn rsadp(sk: SK, c: RSAInt) -> RSAIntResult {
 
 pub fn rsasp1(sk: SK, m: RSAInt) -> RSAIntResult {
     let (n, d) = sk;
-    if m > n - RSAInt::from_literal(1u128) {
+    if m > n - RSAInt::ONE() {
         RSAIntResult::Err(Error::MessageTooLarge)
     } else {
         RSAIntResult::Ok(m.pow_mod(d, n))
@@ -80,7 +80,7 @@ pub fn rsasp1(sk: SK, m: RSAInt) -> RSAIntResult {
 
 pub fn rsavp1(pk: PK, s: RSAInt) -> RSAIntResult {
     let (n, e) = pk;
-    if s > n - RSAInt::from_literal(1u128) {
+    if s > n - RSAInt::ONE() {
         RSAIntResult::Err(Error::MessageTooLarge)
     } else {
         RSAIntResult::Ok(s.pow_mod(e, n))
