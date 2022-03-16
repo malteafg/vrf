@@ -69,13 +69,11 @@ pub fn ecvrf_proof_to_hash(pi: &ByteSeq) -> ByteSeqResult {
     let proof_to_hash_domain_separator_back = ByteSeq::new(0);
 
     // STEP 6
-    // TODO this is stupid (and possibly wrong?) 1 byte too much. mby slice?
     let suite_string = ByteSeq::new(3);
-    let empty = ByteSeq::new(0);
-    ByteSeqResult::Ok(empty.concat(&sha512(&suite_string
+    ByteSeqResult::Ok(sha512(&suite_string
         .concat(&proof_to_hash_domain_separator_front)
         .concat(&encode(point_mul_by_cofactor(gamma)))
-        .concat(&proof_to_hash_domain_separator_back))))
+        .concat(&proof_to_hash_domain_separator_back)).slice(0,64))
 }
 
 // TODO add validate_key stuff
@@ -94,36 +92,38 @@ pub fn ecvrf_verify(
     
     // STEP 3
     // TODO probably not hacspec, result?
+    let mut result = ByteSeqResult::Ok(ByteSeq::new(0));
     if validate_key {
         if !ecvrf_validate_key(pk) {
-            return ByteSeqResult::Err(Error::InvalidPublicKey)
+            result = ByteSeqResult::Err(Error::InvalidPublicKey)
+        }
+    } else {
+        // STEP 4, 5 (it panics if invalid) and 6
+        // TODO fix decode proof such that it doesn't panic
+        let (gamma, c, s) = ecvrf_decode_proof(pi);
+
+        // STEP 7
+        // TODO this is stupid remove code duplication
+        let pk_string = secret_to_public_string(sk);
+        let h = ecvrf_encode_to_curve(&pk_string, alpha);
+
+        // STEP 8
+        let u = point_add(point_mul(s, base), point_neg(point_mul(c,y)));
+
+        // STEP 9
+        let v = point_add(point_mul(s, h), point_neg(point_mul(c,gamma)));
+
+        // STEP 10
+        let c_prime = ecvrf_challenge_generation(y, h, gamma, u, v);
+        
+        // STEP 11, result sketchy, result type
+        if c == c_prime {
+            result = ecvrf_proof_to_hash(pi)
+        } else {
+            result = ByteSeqResult::Err(Error::InvalidLength)
         }
     }
-
-    // STEP 4, 5 (it panics if invalid) and 6
-    // TODO fix decode proof such that it doesn't panic
-    let (gamma, c, s) = ecvrf_decode_proof(pi);
-
-    // STEP 7
-    // TODO this is stupid remove code duplication
-    let pk_string = secret_to_public_string(sk);
-    let h = ecvrf_encode_to_curve(&pk_string, alpha);
-
-    // STEP 8
-    let u = point_add(point_mul(s, base), point_neg(point_mul(c,y)));
-
-    // STEP 9
-    let v = point_add(point_mul(s, h), point_neg(point_mul(c,gamma)));
-
-    // STEP 10
-    let c_prime = ecvrf_challenge_generation(y, h, gamma, u, v);
-    
-    // STEP 11, result sketchy, result type
-    if c == c_prime {
-        ecvrf_proof_to_hash(pi)
-    } else {
-        ByteSeqResult::Err(Error::InvalidLength)
-    }
+    result
 }
 
 // AUXILLIARY FUNCTIONS ========================================================
@@ -152,9 +152,7 @@ fn ecvrf_encode_to_curve(
                 .concat(&ctr_string)
                 .concat(&encode_to_curve_domain_separator_back));
             
-            // TODO this is stupid
-            let empty = ByteSeq::new(0);
-            h = decode(empty.concat(&hash_string));
+            h = decode(hash_string.slice(0,64));
         }
     }
     let h = h.unwrap();

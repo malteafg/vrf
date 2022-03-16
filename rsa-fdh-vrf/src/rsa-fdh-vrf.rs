@@ -142,8 +142,7 @@ pub fn proof_to_hash(pi_string: &ByteSeq) -> ByteSeqResult {
     // STEP 3
     // TODO this is stupid
     // sha256(&hash_string)
-    let empty = ByteSeq::new(0);
-    ByteSeqResult::Ok(empty.concat(&sha_digest))
+    ByteSeqResult::Ok(sha_digest.slice(0,32))
 }
 
 // TODO check if we should include mgf_salt

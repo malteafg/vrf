@@ -1,0 +1,19 @@
+[package]
+name = "ed25519-hash"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+path = "src/ed25519-hash.rs"
+
+[dependencies]
+hacspec-lib = { path = "../../hacspec/lib" }
+hacspec-sha512 = { path = "../../hacspec/examples/sha512" }
+hacspec-ed25519 = { path = "../../hacspec/examples/ed25519" }
+hacspec-curve25519 = { path = "../../hacspec/examples/curve25519" }
+
+[dev-dependencies]
+quickcheck = "1"
+quickcheck_macros = "1"
