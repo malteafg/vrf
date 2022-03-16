@@ -5,10 +5,10 @@ use hacspec_curve25519::*;
 
 const B_IN_BYTES: usize = 64;
 const S_IN_BYTES: usize = 128;
-const L: usize = 64;
-const J: u128 = 486662;
-const K: u128 = 1;
-const Z: u128 = 2;
+const L: usize = 64usize;
+const J: u128 = 486662u128;
+const K: u128 = 1u128;
+const Z: u128 = 2u128;
 
 array!(ArrEd25519FieldElement, 4, U64);
 

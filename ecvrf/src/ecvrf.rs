@@ -1,6 +1,7 @@
 use hacspec_lib::*;
 use hacspec_ed25519::*;
 use hacspec_sha512::*;
+use ed25519_hash::*;
 
 pub enum Error {
     InvalidLength,
@@ -15,6 +16,7 @@ pub type ByteSeqResult = Result<ByteSeq, Error>;
 const C_LEN: usize = 16usize;
 const PT_LEN: usize = 32usize;
 const Q_LEN: usize = 32usize;
+const SUITE_INT: usize = 3usize;
     
 // ECVRF =======================================================================
 
@@ -32,7 +34,8 @@ pub fn ecvrf_prove(
 
     // STEP 2
     let encode_to_curve_salt = secret_to_public_string(sk);
-    let h = ecvrf_encode_to_curve(&encode_to_curve_salt, alpha);
+    let h = ecvrf_encode_to_curve_try_and_increment(
+        &encode_to_curve_salt, alpha);
 
     // STEP 3
     let h_string = encode(h);
@@ -69,7 +72,7 @@ pub fn ecvrf_proof_to_hash(pi: &ByteSeq) -> ByteSeqResult {
     let proof_to_hash_domain_separator_back = ByteSeq::new(0);
 
     // STEP 6
-    let suite_string = ByteSeq::new(3);
+    let suite_string = ByteSeq::new(SUITE_INT);
     ByteSeqResult::Ok(sha512(&suite_string
         .concat(&proof_to_hash_domain_separator_front)
         .concat(&encode(point_mul_by_cofactor(gamma)))
@@ -105,7 +108,7 @@ pub fn ecvrf_verify(
         // STEP 7
         // TODO this is stupid remove code duplication
         let pk_string = secret_to_public_string(sk);
-        let h = ecvrf_encode_to_curve(&pk_string, alpha);
+        let h = ecvrf_encode_to_curve_try_and_increment(&pk_string, alpha);
 
         // STEP 8
         let u = point_add(point_mul(s, base), point_neg(point_mul(c,y)));
@@ -130,9 +133,10 @@ pub fn ecvrf_verify(
 // Note that section 5.5 also uses a point_to_string function.
 
 // See section 5.4.1
+// For use in cipher suite 3
 // Note that this should not be used when alpha should remain secret
 // Panics occasionally with very low probability
-fn ecvrf_encode_to_curve(
+fn ecvrf_encode_to_curve_try_and_increment(
     encode_to_curve_salt: &ByteSeq, alpha: &ByteSeq
 ) -> EdPoint {
     let encode_to_curve_domain_separator_front = ByteSeq::new(1);
@@ -144,7 +148,7 @@ fn ecvrf_encode_to_curve(
     for ctr in 1..256 {
         if h == None {
             let ctr_string = ByteSeq::new(ctr);
-            let suite_string = ByteSeq::new(3);
+            let suite_string = ByteSeq::new(SUITE_INT);
             let hash_string = sha512(&suite_string
                 .concat(&encode_to_curve_domain_separator_front)
                 .concat(encode_to_curve_salt)
@@ -157,6 +161,22 @@ fn ecvrf_encode_to_curve(
     }
     let h = h.unwrap();
     point_mul_by_cofactor(h)
+}
+
+// For use in cipher suite 4, not currently used
+fn ecvrf_encode_to_curve_h2c_suite(
+    encode_to_curve_salt: &ByteSeq, alpha: &ByteSeq
+) -> EdPoint {
+    let string_to_be_hashed = encode_to_curve_salt.concat(alpha);
+    let suite_string = ByteSeq::new(SUITE_INT);
+    // TODO is it the correct h2c_suite_ID_string
+    // let dst = ByteSeq::from_literal("ECVRF_")
+    //     .concat(&ByteSeq::from_literal("edwards25519_XMD:SHA-512_ELL2_RO_"))
+    // TODO fix this, this is stupid
+    let dst = ByteSeq::new(0)
+        .concat(&ByteSeq::new(1))
+        .concat(&suite_string);
+    ed_hash_to_curve(&string_to_be_hashed, &dst)
 }
 
 // See section 5.4.2
@@ -186,7 +206,7 @@ fn ecvrf_challenge_generation(
 ) -> Scalar {
     let challenge_generation_domain_separator_front = ByteSeq::new(2);
     let challenge_generation_domain_separator_back = ByteSeq::new(0);
-    let suite_string = ByteSeq::new(3);
+    let suite_string = ByteSeq::new(SUITE_INT);
     let string = suite_string
         .concat(&challenge_generation_domain_separator_front)
         .concat(&compress(p1).to_le_bytes())
