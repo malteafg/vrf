@@ -76,8 +76,7 @@ fn ed_is_square(x: Ed25519FieldElement) -> bool {
     tv == Ed25519FieldElement::ZERO() || tv == Ed25519FieldElement::ONE()
 }
 
-// taken from bls12-381-hash.rs
-// Returns true if x is odd and false otherwise
+// Returns true if x is odd and false otherwise?
 // TODO what the fuck
 fn ed_sgn0(x: Ed25519FieldElement) -> bool {
     x % Ed25519FieldElement::TWO() == Ed25519FieldElement::ONE()
@@ -126,6 +125,7 @@ fn map_to_curve_elligator2(u: Ed25519FieldElement) -> Point {
     X25519FieldElement::from_byte_seq_le(t.to_byte_seq_le()))
 }
 
+// https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#name-mappings-for-montgomery-cur
 fn monty_to_edw(p: Point) -> EdPoint {
     let (s,t) = p;
     let one = X25519FieldElement::ONE();
