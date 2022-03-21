@@ -37,11 +37,11 @@ pub fn ecvrf_prove(
     let pk = decompress(secret_to_public(sk)).ok_or(Error::InvalidPublicKey)?;
 
     // STEP 2
-    let encode_to_curve_salt = encode(pk);
+    let encode_to_curve_salt = compress(pk).slice(0,32);
     let h = ecvrf_encode_to_curve_h2c_suite(&encode_to_curve_salt, alpha);
 
     // STEP 3
-    let h_string = encode(h);
+    let h_string = compress(h).slice(0,32);
 
     // STEP 4
     let gamma = point_mul(x, h);
@@ -58,9 +58,9 @@ pub fn ecvrf_prove(
     let s = k + c * x;
 
     // STEP 8 and 9
-    ByteSeqResult::Ok(encode(gamma)
+    ByteSeqResult::Ok(compress(gamma)
         .concat(&Scalar::to_byte_seq_le(c).slice(0, C_LEN))
-        .concat(&Scalar::to_byte_seq_le(s).slice(0, Q_LEN)))
+        .concat(&Scalar::to_byte_seq_le(s).slice(0, Q_LEN)).slice(0,32))
 }
 
 pub fn ecvrf_proof_to_hash(pi: &ByteSeq) -> ByteSeqResult {
@@ -75,7 +75,7 @@ pub fn ecvrf_proof_to_hash(pi: &ByteSeq) -> ByteSeqResult {
     let suite_string = ByteSeq::new(SUITE_INT);
     ByteSeqResult::Ok(sha512(&suite_string
         .concat(&proof_to_hash_domain_separator_front)
-        .concat(&encode(point_mul_by_cofactor(gamma)))
+        .concat(&compress(point_mul_by_cofactor(gamma)).slice(0,32))
         // slice because sha512 returns digest instead of byteseq
         .concat(&proof_to_hash_domain_separator_back)).slice(0,64))
 }
@@ -98,7 +98,7 @@ pub fn ecvrf_verify(
     let (gamma, c, s) = ecvrf_decode_proof(pi)?;
 
     // STEP 7
-    let encode_to_curve_salt = encode(y);
+    let encode_to_curve_salt = compress(y).slice(0,32);
     let h = ecvrf_encode_to_curve_h2c_suite(&encode_to_curve_salt, alpha);
 
     // STEP 8
@@ -145,7 +145,7 @@ pub fn ecvrf_verify(
 //                 .concat(alpha)
 //                 .concat(&ctr_string)
 //                 .concat(&encode_to_curve_domain_separator_back));
-            
+//             // TODO do not use decode, slice somehow instead
 //             h = decode(hash_string.slice(0,64));
 //         }
 //     }
@@ -171,7 +171,6 @@ fn ecvrf_encode_to_curve_h2c_suite(
 // 
 // This implements 5.1.6 of RFC8032
 fn ecvrf_nonce_generation(sk: SecretKey, h_string: &ByteSeq) -> Scalar {
-    // TODO should this be le bytes?
     let hashed_sk_string = sha512(&sk.to_le_bytes());
     let truncated_hashed_sk_string = hashed_sk_string.slice(32,32);
     let k_string = sha512(&truncated_hashed_sk_string.concat(h_string));
@@ -189,15 +188,14 @@ fn ecvrf_challenge_generation(
     let suite_string = ByteSeq::new(SUITE_INT);
     let string = suite_string
         .concat(&challenge_generation_domain_separator_front)
-        .concat(&encode(p1))
-        .concat(&encode(p2))
-        .concat(&encode(p3))
-        .concat(&encode(p4))
-        .concat(&encode(p5))
+        .concat(&compress(p1).slice(0,32))
+        .concat(&compress(p2).slice(0,32))
+        .concat(&compress(p3).slice(0,32))
+        .concat(&compress(p4).slice(0,32))
+        .concat(&compress(p5).slice(0,32))
         .concat(&challenge_generation_domain_separator_back);
     let c_string = sha512(&string);
     let truncated_c_string = c_string.slice(0, C_LEN-1);
-    // TODO should this be le bytes? 
     Scalar::from_byte_seq_le(truncated_c_string)
 }
 
@@ -206,7 +204,7 @@ fn ecvrf_decode_proof(pi: &ByteSeq) -> ProofResult {
     let gamma_string = pi.slice(0, PT_LEN);
     let c_string = pi.slice(PT_LEN, C_LEN);
     let s_string = pi.slice(PT_LEN + C_LEN, Q_LEN);
-    let gamma = decode(gamma_string);
+    let gamma = decompress(CompressedEdPoint::from_slice(&gamma_string, 0, 32));
     
     let gamma = gamma.ok_or(Error::InvalidProof)?;
 
