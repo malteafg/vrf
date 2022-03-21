@@ -50,7 +50,7 @@ pub fn expand_message_xmd(msg: &ByteSeq, dst: &ByteSeq, len_in_bytes: usize) -> 
     uniform_bytes.truncate(len_in_bytes)
 }
 
-// taken from bls12-381-hash.rs
+// adapted from bls12-381-hash.rs
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#section-5.3
 pub fn ed_hash_to_field(msg: &ByteSeq, dst: &ByteSeq, count: usize) -> Seq<Ed25519FieldElement> {
     let len_in_bytes = count * L; // count * m * L
@@ -69,7 +69,7 @@ pub fn ed_hash_to_field(msg: &ByteSeq, dst: &ByteSeq, count: usize) -> Seq<Ed255
     output
 }
 
-// taken from bls12-381-hash.rs
+// adapted from bls12-381-hash.rs
 fn ed_is_square(x: Ed25519FieldElement) -> bool {
     let c1 = Ed25519FieldElement::from_byte_seq_be(&P_1_2.to_be_bytes()); // (p - 1) / 2
     let tv = x.pow_self(c1);
@@ -82,7 +82,7 @@ fn ed_sgn0(x: Ed25519FieldElement) -> bool {
     x % Ed25519FieldElement::TWO() == Ed25519FieldElement::ONE()
 }
 
-// taken from bls12-381-hash.rs
+// adapted from bls12-381-hash.rs
 fn ed_clear_cofactor(x: EdPoint) -> EdPoint {
     point_mul_by_cofactor(x)
 }
