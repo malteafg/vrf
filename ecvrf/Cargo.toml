@@ -12,7 +12,7 @@ path = "src/ecvrf.rs"
 hacspec-lib = { path = "../../hacspec/lib" }
 hacspec-sha512 = { path = "../../hacspec/examples/sha512" }
 hacspec-ed25519 = { path = "../../hacspec/examples/ed25519" }
-ed25519-hash = { path = "../ed25519-hash"}
+ed25519-hash = { path = "../ed25519-hash" }
 
 [dev-dependencies]
 quickcheck = "1"
