@@ -3,12 +3,12 @@ use hacspec_ed25519::*;
 use hacspec_sha512::*;
 use hacspec_curve25519::*;
 
-const B_IN_BYTES: usize = 64;
-const S_IN_BYTES: usize = 128;
-const L: usize = 64;
-const J: u128 = 486662;
-const K: u128 = 1;
-const Z: u128 = 2;
+const B_IN_BYTES: usize = 64usize;
+const S_IN_BYTES: usize = 128usize;
+const L: usize = 64usize;
+const J: u128 = 486662u128;
+const K: u128 = 1u128;
+const Z: u128 = 2u128;
 
 array!(ArrEd25519FieldElement, 4, U64);
 
@@ -93,8 +93,6 @@ fn ed_clear_cofactor(x: EdPoint) -> EdPoint {
 }
 
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#section-6.7.1
-// TODO check exceptional case defined in 6.7.1 probably not needed as q=5(mod 8)
-// TODO k is equal to one
 fn map_to_curve_elligator2(u: Ed25519FieldElement) -> Point {
     let j = Ed25519FieldElement::from_literal(J);
     let k = Ed25519FieldElement::from_literal(K);
@@ -102,7 +100,6 @@ fn map_to_curve_elligator2(u: Ed25519FieldElement) -> Point {
     let one = Ed25519FieldElement::ONE();
     let zero = Ed25519FieldElement::ZERO();
 
-    // TODO is this inv okay?
     let mut x1 = zero - (j / k) * (one + z * u * u).inv();
     if x1 == zero {
         x1 = zero - (j / k);
@@ -117,13 +114,13 @@ fn map_to_curve_elligator2(u: Ed25519FieldElement) -> Point {
         // TODO what to do with unwrap?
         y = sqrt(gx1).unwrap();
         if sgn0_m_eq_1(y) {
-            y = zero - sqrt(gx1).unwrap();
+            y = zero - y;
         }
     } else {
         x = x2;
         y = sqrt(gx2).unwrap();
         if !sgn0_m_eq_1(y) {
-            y = zero - sqrt(gx1).unwrap();
+            y = zero - y;
         }
     }
     let s = x * k;

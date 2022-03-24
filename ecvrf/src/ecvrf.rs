@@ -125,33 +125,31 @@ pub fn ecvrf_verify(
 // For ciphersuite 3
 // Note that this should not be used when alpha should remain secret
 // Panics occasionally with very low probability
-// Not in hacspec
-// fn ecvrf_encode_to_curve_try_and_increment(
-//     encode_to_curve_salt: &ByteSeq, alpha: &ByteSeq
-// ) -> EdPoint {
-//     let encode_to_curve_domain_separator_front = ByteSeq::new(1);
-//     let encode_to_curve_domain_separator_back = ByteSeq::new(0);
+fn ecvrf_encode_to_curve_try_and_increment(
+    encode_to_curve_salt: &ByteSeq, alpha: &ByteSeq
+) -> EdPoint {
+    let encode_to_curve_domain_separator_front = ByteSeq::new(1);
+    let encode_to_curve_domain_separator_back = ByteSeq::new(0);
 
-//     let mut h: Option<EdPoint> = None;
+    let mut h: Option<EdPoint> = Option::<EdPoint>::None;
 
-//     // TODO can we have while loops in hacspec?
-//     for ctr in 1..256 {
-//         if h == None {
-//             let ctr_string = ByteSeq::new(ctr);
-//             let suite_string = ByteSeq::new(SUITE_INT);
-//             let hash_string = sha512(&suite_string
-//                 .concat(&encode_to_curve_domain_separator_front)
-//                 .concat(encode_to_curve_salt)
-//                 .concat(alpha)
-//                 .concat(&ctr_string)
-//                 .concat(&encode_to_curve_domain_separator_back));
-//             // TODO do not use decode, slice somehow instead
-//             h = decode(hash_string.slice(0,64));
-//         }
-//     }
-//     let h = h.unwrap();
-//     point_mul_by_cofactor(h)
-// }
+    // TODO can we have while loops in hacspec?
+    for ctr in 1..256 {
+        if h == Option::<EdPoint>::None {
+            let ctr_string = ByteSeq::new(ctr);
+            let suite_string = ByteSeq::new(SUITE_INT);
+            let hash_string = sha512(&suite_string
+                .concat(&encode_to_curve_domain_separator_front)
+                .concat(encode_to_curve_salt)
+                .concat(alpha)
+                .concat(&ctr_string)
+                .concat(&encode_to_curve_domain_separator_back));
+            h = decompress(CompressedEdPoint::from_slice(&hash_string, 0, 64));
+        }
+    }
+    let h = h.unwrap();
+    point_mul_by_cofactor(h)
+}
 
 // See section 5.4.1.2
 fn ecvrf_encode_to_curve_h2c_suite(
