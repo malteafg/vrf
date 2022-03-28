@@ -159,7 +159,7 @@ fn ecvrf_encode_to_curve_h2c_suite(
     let suite_string = ByteSeq::new(SUITE_INT);
     // TODO Faked, fix later:
     let dst = suite_string;
-    ed_hash_to_curve(&string_to_be_hashed, &dst)
+    ed_encode_to_curve(&string_to_be_hashed, &dst)
 }
 
 // See section 5.4.2

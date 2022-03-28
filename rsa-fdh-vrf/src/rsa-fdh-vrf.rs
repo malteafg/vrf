@@ -89,8 +89,6 @@ pub fn verify(pk: PK, alpha: &ByteSeq, pi_string: &ByteSeq) -> ByteSeqResult {
     result
 }
 
-// TODO check what we should do for the ciphersuites (different hash functions)
-
 // TESTING =====================================================================
 #[cfg(test)]
 extern crate quickcheck;
