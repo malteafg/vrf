@@ -2,13 +2,15 @@ use hacspec_lib::*;
 use hacspec_sha256::*;
 
 pub const BIT_SIZE: u32  = 1024u32;
-pub const BYTE_SIZE: u32 = 127u32;
+pub const BYTE_SIZE: u32 = 1024u32 / 8u32;
 const HLEN: usize = 32usize; // sha256 / 8 = 32
 unsigned_public_integer!(RSAInt, 1024);
 
 pub enum Error {
     InvalidLength,
     MessageTooLarge,
+    MessageTooLargeVerify,
+    InvalidProof,
 }
 
 pub type PK = (RSAInt, RSAInt);
@@ -23,7 +25,7 @@ pub fn i2osp(x: RSAInt, x_len: u32) -> ByteSeqResult {
         ByteSeqResult::Err(Error::InvalidLength)
     } else {
         ByteSeqResult::Ok(RSAInt::to_byte_seq_be(x)
-            .slice((BIT_SIZE / 8u32 - x_len) as usize, x_len as usize))
+            .slice((BYTE_SIZE - x_len) as usize, x_len as usize))
     }
 }
 
@@ -37,8 +39,9 @@ pub fn mgf1(mgf_seed: &ByteSeq, mask_len: usize) -> ByteSeqResult {
         result = ByteSeqResult::Err(Error::InvalidLength)
     } else {
         let mut t = ByteSeq::new(0);
-        for i in 0..((mask_len + 32 - 1) / 32 - 1) {
-            let x = i2osp(RSAInt::from_literal(i as u128), 4u32)?;
+        for i in 0..((mask_len + 32) / 32) {
+            let x = i2osp(RSAInt::from_literal(
+                i as u128), 4u32)?;
             t = t.concat(&sha256(&mgf_seed.concat(&x)));
         }
         result = ByteSeqResult::Ok(t.slice(0, mask_len))
@@ -48,7 +51,7 @@ pub fn mgf1(mgf_seed: &ByteSeq, mask_len: usize) -> ByteSeqResult {
 
 pub fn rsaep(pk: PK, m: RSAInt) -> RSAIntResult {
     let (n, e) = pk;
-    if m > n - RSAInt::from_literal(1u128) {
+    if m > n - RSAInt::ONE() {
         RSAIntResult::Err(Error::MessageTooLarge)
     } else {
         RSAIntResult::Ok(m.pow_mod(e, n))
@@ -57,7 +60,7 @@ pub fn rsaep(pk: PK, m: RSAInt) -> RSAIntResult {
 
 pub fn rsadp(sk: SK, c: RSAInt) -> RSAIntResult {
     let (n, d) = sk;
-    if c > n - RSAInt::from_literal(1u128) {
+    if c > n - RSAInt::ONE() {
         RSAIntResult::Err(Error::MessageTooLarge)
     } else {
         RSAIntResult::Ok(c.pow_mod(d, n))
@@ -66,7 +69,7 @@ pub fn rsadp(sk: SK, c: RSAInt) -> RSAIntResult {
 
 pub fn rsasp1(sk: SK, m: RSAInt) -> RSAIntResult {
     let (n, d) = sk;
-    if m > n - RSAInt::from_literal(1u128) {
+    if m > n - RSAInt::ONE() {
         RSAIntResult::Err(Error::MessageTooLarge)
     } else {
         RSAIntResult::Ok(m.pow_mod(d, n))
@@ -75,13 +78,15 @@ pub fn rsasp1(sk: SK, m: RSAInt) -> RSAIntResult {
 
 pub fn rsavp1(pk: PK, s: RSAInt) -> RSAIntResult {
     let (n, e) = pk;
-    if s > n - RSAInt::from_literal(1u128) {
-        RSAIntResult::Err(Error::MessageTooLarge)
+    if s > n - RSAInt::ONE() {
+        RSAIntResult::Err(Error::MessageTooLargeVerify)
     } else {
         RSAIntResult::Ok(s.pow_mod(e, n))
     }
 }
 
+
+// TESTING =====================================================================
 #[cfg(test)]
 extern crate quickcheck;
 
@@ -102,24 +107,15 @@ use glass_pumpkin::prime;
 use quickcheck::*;
 
 #[cfg(test)]
-impl Arbitrary for RSAInt {
-    fn arbitrary(g: &mut Gen) -> RSAInt {
-        let mut a: [u8; BYTE_SIZE as usize] = [0; BYTE_SIZE as usize];
-        for i in 0..BYTE_SIZE as usize {
-            a[i] = u8::arbitrary(g);
-        }
-        RSAInt::from_byte_seq_be(&Seq::<U8>::from_public_slice(&a))
-    }
-}
-
-#[cfg(test)]
 mod tests {
     use super::*;
 
+// KEYGEN ======================================================================
     // Taken from https://asecuritysite.com/rust/rsa01/ 
     fn modinv(a0: BigInt, m0: BigInt) -> BigInt {
         if m0 == one() {return one()}
-        let (mut a, mut m, mut x0, mut inv) = (a0, m0.clone(), zero(), one());
+        let (mut a, mut m, mut x0, mut inv) = 
+            (a0, m0.clone(), zero(), one());
         while a > one() {
             inv -= (&a / &m) * &x0;
             a = &a % &m;
@@ -131,8 +127,10 @@ mod tests {
     }
 
     fn rsa_key_gen() -> KeyPair {
-        let p = BigInt::from_biguint(Sign::Plus,prime::new((BIT_SIZE / 2) as usize).unwrap());
-        let q = BigInt::from_biguint(Sign::Plus,prime::new((BIT_SIZE / 2) as usize).unwrap());
+        let p = BigInt::from_biguint(Sign::Plus,
+            prime::new((BIT_SIZE / 2) as usize).unwrap());
+        let q = BigInt::from_biguint(Sign::Plus,
+            prime::new((BIT_SIZE / 2) as usize).unwrap());
 
         let n = RSAInt::from(p.clone()* q.clone());
 
@@ -143,8 +141,20 @@ mod tests {
         ((n, RSAInt::from(e)), (n, RSAInt::from(d)))
     }
 
+// QUICKCHECK ==================================================================
     #[derive(Clone, Copy, Debug)]
     struct Keyp {n: RSAInt, d: RSAInt, e: RSAInt}
+
+    impl Arbitrary for RSAInt {
+        fn arbitrary(g: &mut Gen) -> RSAInt {
+            const NUM_BYTES: u32 = 127;
+            let mut a: [u8; NUM_BYTES as usize] = [0; NUM_BYTES as usize];
+            for i in 0..NUM_BYTES as usize {
+                a[i] = u8::arbitrary(g);
+            }
+            RSAInt::from_byte_seq_be(&Seq::<U8>::from_public_slice(&a))
+        }
+    }
 
     impl Arbitrary for Keyp {
         fn arbitrary(_g: &mut Gen) -> Keyp {
@@ -153,15 +163,17 @@ mod tests {
         }
     }
 
+// RSA TESTS ===================================================================
     #[quickcheck]
     fn i2os2i(x: RSAInt) -> bool {
-        match i2osp(x, BYTE_SIZE) {
+        match i2osp(x, 128) {
             Ok(i) => x == os2ip(&i),
             Err(_e) => panic!(),
         }
     }
 
     #[quickcheck]
+    #[ignore]
     fn rsaeprsadp(x: RSAInt, kp: Keyp) -> bool {
         match rsaep((kp.n, kp.e), x) {
             Ok(i) => 
@@ -174,10 +186,11 @@ mod tests {
     }
 
     #[quickcheck]
+    #[ignore]
     fn rsasp1rsavp1(x: RSAInt, kp: Keyp) -> bool {
         match rsasp1((kp.n, kp.d), x) {
-            Ok(i) => 
-                match rsavp1((kp.n, kp.e), i) {
+            Ok(s) => 
+                match rsavp1((kp.n, kp.e), s) {
                     Ok(i) => i == x,
                     Err(_e) => panic!(),
                 }
@@ -186,6 +199,7 @@ mod tests {
     }
 
     #[quickcheck]
+    #[ignore]
     fn neg_rsaeprsadp(x: RSAInt, y: RSAInt, kp: Keyp) -> bool {
         match rsaep((kp.n, kp.e), x) {
             Ok(_i) => 
@@ -198,6 +212,7 @@ mod tests {
     }
 
     #[quickcheck]
+    #[ignore]
     fn neg_rsasp1rsavp1(x: RSAInt, y: RSAInt, kp: Keyp) -> bool {
         match rsasp1((kp.n, kp.d), x) {
             Ok(_i) => 
@@ -210,6 +225,7 @@ mod tests {
     }
 
     #[quickcheck]
+    #[ignore]
     fn negkey_rsaeprsadp(x: RSAInt, kp: Keyp, fake: Keyp) -> bool {
         match rsaep((kp.n, kp.e), x) {
             Ok(_i) => 
@@ -222,6 +238,8 @@ mod tests {
     }
 
     #[quickcheck]
+    #[ignore]
+    // NOTE, failed once with division by zero in rust biguint
     fn negkey_rsasp1rsavp1(x: RSAInt, kp: Keyp, fake: Keyp) -> bool {
         match rsasp1((kp.n, kp.d), x) {
             Ok(_i) => 
@@ -232,6 +250,7 @@ mod tests {
             Err(_e) => panic!(),
         }
     }
+
     #[test]
     fn uniti2os2i() {
         let x = RSAInt::from_literal(12341234);
@@ -278,4 +297,18 @@ mod tests {
         }
     }
 
+    #[test]
+    fn unitrsasp1rsavp1_large_num() {
+        let (pk, sk) = rsa_key_gen();
+        let x = os2ip(&ByteSeq::from_hex("fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0"));
+        match rsasp1(sk, x) {
+            Ok(i) => 
+                match rsavp1(pk, i) {
+                    Ok(i) => assert_eq!(i, x),
+                    Err(_e) => panic!(),
+                }
+            Err(_e) => panic!(),
+        }
+    }
 }
+
