@@ -4,7 +4,7 @@ use rsa::*;
 
 // VRF stuff ===================================================================
 
-fn rsa_fdh_vrf_mgf1(n: RSAInt, alpha: &ByteSeq) -> ByteSeqResult {
+fn vrf_mgf1(n: RSAInt, alpha: &ByteSeq) -> ByteSeqResult {
     let suite_string = i2osp(RSAInt::from_literal(1u128), 1u32)?;
     let mgf_domain_separator = i2osp(RSAInt::from_literal(1u128), 1u32)?;
 
@@ -27,7 +27,7 @@ pub fn prove(sk: SK, alpha: &ByteSeq) -> ByteSeqResult {
     let (n, _d) = sk;
 
     // STEP 1 and 2
-    let em = rsa_fdh_vrf_mgf1(n, alpha)?;
+    let em = vrf_mgf1(n, alpha)?;
 
     // STEP 3
     let m = os2ip(&em);
@@ -35,7 +35,7 @@ pub fn prove(sk: SK, alpha: &ByteSeq) -> ByteSeqResult {
     // STEP 4
     let s = rsasp1(sk, m)?;
 
-    // STEP 5
+    // STEP 5 and 6
     i2osp(s, BYTE_SIZE)
 }
 
@@ -52,12 +52,11 @@ pub fn proof_to_hash(pi_string: &ByteSeq) -> ByteSeqResult {
     let hash_string = suite_string
         .concat(&proof_to_hash_domain_separator
         .concat(pi_string));
-    let sha_digest = sha256(&hash_string);
 
     // STEP 3
     // TODO this is stupid
     // sha256(&hash_string)
-    ByteSeqResult::Ok(sha_digest.slice(0,32))
+    ByteSeqResult::Ok(sha256(&hash_string).slice(0,32))
 }
 
 // TODO check if we should include mgf_salt
@@ -73,7 +72,7 @@ pub fn verify(pk: PK, alpha: &ByteSeq, pi_string: &ByteSeq) -> ByteSeqResult {
     let m = rsavp1(pk, s)?;
 
     // STEP 3 and 4
-    let em_prime = rsa_fdh_vrf_mgf1(n, alpha)?;
+    let em_prime = vrf_mgf1(n, alpha)?;
 
     // STEP 5
     let m_prime = os2ip(&em_prime);
@@ -261,5 +260,13 @@ mod tests {
             Err(_e) => panic!(),
         }
     }
+
+    #[test]
+    fn test() {
+        match i2osp(RSAInt::from_literal(1), 1) {
+            Ok(v) => println!("{}", v.to_hex()),
+            Err(_e) => panic!()
+        }
+    } 
 }
 
