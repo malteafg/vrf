@@ -239,4 +239,10 @@ use quickcheck::*;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test() {
+        let v = ByteSeq::new(0);
+        println!("{}", v.to_hex());
+    } 
 }

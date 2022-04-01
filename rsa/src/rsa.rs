@@ -6,6 +6,7 @@ pub const BYTE_SIZE: u32 = 1024u32 / 8u32;
 const HLEN: usize = 32usize; // sha256 / 8 = 32
 unsigned_public_integer!(RSAInt, 1024);
 
+#[derive(Debug)]
 pub enum Error {
     InvalidLength,
     MessageTooLarge,
@@ -225,16 +226,8 @@ mod tests {
     }
 
     #[quickcheck]
-    #[ignore]
     fn negkey_rsaeprsadp(x: RSAInt, kp: Keyp, fake: Keyp) -> bool {
-        match rsaep((kp.n, kp.e), x) {
-            Ok(_i) => 
-                match rsadp((fake.n, fake.d), x) {
-                    Ok(i) => i != x,
-                    Err(_e) => panic!(),
-                }
-            Err(_e) => panic!(),
-        }
+        rsaep((kp.n, kp.e), x).unwrap() != rsadp((fake.n, fake.d), x).unwrap()
     }
 
     #[quickcheck]
