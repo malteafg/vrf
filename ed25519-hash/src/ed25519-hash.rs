@@ -71,6 +71,7 @@ pub fn ed_hash_to_field(
 ) -> Seq<Ed25519FieldElement> {
     let len_in_bytes = count * L; // count * m * L
     let uniform_bytes = expand_message_xmd(msg, dst, len_in_bytes);
+    // let uniform_bytes = ByteSeq::from_hex("d620782a206d9de584b74e23ae5ee1db5ca5298b3fc527c4867f049dee6dd419b3674967bd614890f621c128d72269ae");
     let mut output = Seq::<Ed25519FieldElement>::new(count);
 
     for i in 0..count {
@@ -111,7 +112,7 @@ fn map_to_curve_elligator2(u: Ed25519FieldElement) -> Point {
 
     let mut x1 = (zero - j) * (one + (z * u * u)).inv();
     println!("u: {}", u);
-    println!("uu: {}", (one + (z * u * u)).inv());
+    println!("onezuuinv: {}", (one + (z * u * u)).inv());
     if x1 == zero {
         x1 = zero - j;
     }
@@ -242,16 +243,16 @@ mod tests {
         let u = ed_hash_to_field(&msg, &dst, 1);
         assert_eq!(u[0usize].to_byte_seq_be().to_hex(), 
             "09cfa30ad79bd59456594a0f5d3a76f6b71c6787b04de98be5cd201a556e253b");
+        assert_eq!(u[0usize], Ed25519FieldElement::from_hex( 
+            "09cfa30ad79bd59456594a0f5d3a76f6b71c6787b04de98be5cd201a556e253b"));
         
         let q = map_to_curve_elligator2_edwards(u[0usize]);
         let (qx, qy, qz, _) = q;
         let qz_inv = qz.inv();
         let qx = qx * qz_inv;
         let qy = qy * qz_inv;
-        assert_eq!(qx, Ed25519FieldElement::from_hex(
-            "333e41b61c6dd43af220c1ac34a3663e1cf537f996bab50ab66e33c4bd8e4e19"));
-        assert_eq!(qy, Ed25519FieldElement::from_hex(
-            "51b6f178eb08c4a782c820e306b82c6e273ab22e258d972cd0c511787b2a3443"));
+        assert_eq!(qx.to_byte_seq_be().to_hex(), "333e41b61c6dd43af220c1ac34a3663e1cf537f996bab50ab66e33c4bd8e4e19");
+        assert_eq!(qy.to_byte_seq_be().to_hex(), "51b6f178eb08c4a782c820e306b82c6e273ab22e258d972cd0c511787b2a3443");
 
         // let (x, y, z, _) = ed_clear_cofactor(q);
         // let z_inv = z.inv();
@@ -265,6 +266,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn empty_test() {
         let msg = ByteSeq::from_public_slice(b"");
         let dst = ByteSeq::from_public_slice(
@@ -275,8 +277,11 @@ mod tests {
     }
 
     #[test]
+    // #[ignore]
     fn test_g1() {
         let u = Ed25519FieldElement::from_hex("30f037b9745a57a9a2b8a68da81f397c39d46dee9d047f86c427c53f8b29a55c");
+        // let ou = ed_hash_to_field(&ByteSeq::from_public_slice(b""), &ByteSeq::from_public_slice(b""), 1);
+        // assert_eq!(u, ou[0]);
         let q = map_to_curve_elligator2_edwards(u);
     }
     
