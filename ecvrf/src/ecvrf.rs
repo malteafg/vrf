@@ -3,24 +3,27 @@ use hacspec_ed25519::*;
 use hacspec_sha512::*;
 use ed25519_hash::*;
 
-pub enum Error {
-    InvalidLength,
+#[derive(Debug)]
+pub enum Errorec {
+    FailedVerify,
     MessageTooLarge,
     InvalidProof,
     InvalidPublicKey,
     FailedDecompression,
 }
 
-pub type ByteSeqResult = Result<ByteSeq, Error>;
-pub type ProofResult = Result<(EdPoint, Scalar, Scalar), Error>;
+pub type ByteSeqResult = Result<ByteSeq, Errorec>;
+pub type ProofResult = Result<(EdPoint, Scalar, Scalar), Errorec>;
 // TODO a bit weird to use a bool result
-pub type BoolResult = Result<bool, Error>;
+pub type BoolResult = Result<bool, Errorec>;
 
 // These three are defined by the ECVRF-EDWARDS25519-SHA512-TAI suite
 const C_LEN: usize = 16usize;
 const PT_LEN: usize = 32usize;
 const Q_LEN: usize = 32usize;
 const SUITE_INT: usize = 4usize;
+
+fn suite_string() -> ByteSeq { intbyte(SUITE_INT) }
     
 // ECVRF =======================================================================
 
@@ -28,20 +31,22 @@ const SUITE_INT: usize = 4usize;
 pub fn ecvrf_prove(
     sk: SecretKey, alpha: &ByteSeq
 ) -> ByteSeqResult {
-    let base = decompress(BASE).ok_or(Error::FailedDecompression)?;
+    let base = decompress(BASE).ok_or(Errorec::FailedDecompression)?;
     
     // TODO use better secret_expand function?
     // STEP 1
     let (x, _) = secret_expand(sk);
     let x = Scalar::from_byte_seq_le(x);
-    let pk = decompress(secret_to_public(sk)).ok_or(Error::InvalidPublicKey)?;
+    let pk = secret_to_public(sk);
+    let y = decompress(secret_to_public(sk)).ok_or(Errorec::InvalidPublicKey)?;
 
     // STEP 2
-    let encode_to_curve_salt = compress(pk).slice(0,32);
-    let h = ecvrf_encode_to_curve_h2c_suite(&encode_to_curve_salt, alpha);
+    let encode_to_curve_salt = pk.slice(0,32);
+    let h = ecvrf_encode_to_curve_try_and_increment(
+        &encode_to_curve_salt, alpha);
 
     // STEP 3
-    let h_string = compress(h).slice(0,32);
+    let h_string = encode(h);
 
     // STEP 4
     let gamma = point_mul(x, h);
@@ -51,16 +56,17 @@ pub fn ecvrf_prove(
 
     // STEP 6
     let c = ecvrf_challenge_generation(
-        pk, h, gamma, point_mul(k, base), 
+        y, h, gamma, point_mul(k, base), 
         point_mul(k, h));
 
     // STEP 7
     let s = k + c * x;
 
     // STEP 8 and 9
-    ByteSeqResult::Ok(compress(gamma)
+    ByteSeqResult::Ok(encode(gamma)
         .concat(&Scalar::to_byte_seq_le(c).slice(0, C_LEN))
-        .concat(&Scalar::to_byte_seq_le(s).slice(0, Q_LEN)).slice(0,32))
+        .concat(&Scalar::to_byte_seq_le(s).slice(0, Q_LEN))
+                .slice(0, C_LEN + Q_LEN + PT_LEN))
 }
 
 pub fn ecvrf_proof_to_hash(pi: &ByteSeq) -> ByteSeqResult {
@@ -68,14 +74,14 @@ pub fn ecvrf_proof_to_hash(pi: &ByteSeq) -> ByteSeqResult {
     let (gamma, _, _) = ecvrf_decode_proof(pi)?;
 
     // STEP 4 + 5
-    let proof_to_hash_domain_separator_front = ByteSeq::new(3);
-    let proof_to_hash_domain_separator_back = ByteSeq::new(0);
+    let proof_to_hash_domain_separator_front = intbyte(3);
+    let proof_to_hash_domain_separator_back = intbyte(0);
 
     // STEP 6
-    let suite_string = ByteSeq::new(SUITE_INT);
-    ByteSeqResult::Ok(sha512(&suite_string
+    ByteSeqResult::Ok(sha512(&suite_string()
         .concat(&proof_to_hash_domain_separator_front)
-        .concat(&compress(point_mul_by_cofactor(gamma)).slice(0,32))
+        .concat(&encode(point_mul_by_cofactor(gamma)))
+        // .concat(&compress(point_mul_by_cofactor(gamma)).slice(0,32))
         // slice because sha512 returns digest instead of byteseq
         .concat(&proof_to_hash_domain_separator_back)).slice(0,64))
 }
@@ -84,10 +90,10 @@ pub fn ecvrf_proof_to_hash(pi: &ByteSeq) -> ByteSeqResult {
 pub fn ecvrf_verify(
     pk: PublicKey, alpha: &ByteSeq, pi: &ByteSeq, validate_key: bool
 ) -> ByteSeqResult {
-    let base = decompress(BASE).ok_or(Error::FailedDecompression)?;
+    let base = decompress(BASE).ok_or(Errorec::FailedDecompression)?;
 
     // STEP 1 and 2
-    let y = decompress(pk).ok_or(Error::InvalidPublicKey)?;
+    let y = decompress(pk).ok_or(Errorec::InvalidPublicKey)?;
     
     // STEP 3
     if validate_key {
@@ -98,9 +104,11 @@ pub fn ecvrf_verify(
     let (gamma, c, s) = ecvrf_decode_proof(pi)?;
 
     // STEP 7
-    let encode_to_curve_salt = compress(y).slice(0,32);
-    let h = ecvrf_encode_to_curve_h2c_suite(&encode_to_curve_salt, alpha);
+    let encode_to_curve_salt = pk.slice(0,32);
+    let h = ecvrf_encode_to_curve_try_and_increment(
+        &encode_to_curve_salt, alpha);
 
+    // TODO point mul uses scalar
     // STEP 8
     let u = point_add(point_mul(s, base), point_neg(point_mul(c,y)));
 
@@ -111,10 +119,12 @@ pub fn ecvrf_verify(
     let c_prime = ecvrf_challenge_generation(y, h, gamma, u, v);
     
     // STEP 11
+    // print!("\nc:       {} \n", c);
+    // print!("c_prime: {} \n", c_prime);
     if c == c_prime {
         ecvrf_proof_to_hash(pi)
     } else {
-        ByteSeqResult::Err(Error::InvalidLength)
+        ByteSeqResult::Err(Errorec::FailedVerify)
     }
 }
 
@@ -128,23 +138,24 @@ pub fn ecvrf_verify(
 fn ecvrf_encode_to_curve_try_and_increment(
     encode_to_curve_salt: &ByteSeq, alpha: &ByteSeq
 ) -> EdPoint {
-    let encode_to_curve_domain_separator_front = ByteSeq::new(1);
-    let encode_to_curve_domain_separator_back = ByteSeq::new(0);
+    let encode_to_curve_domain_separator_front = intbyte(1);
+    let encode_to_curve_domain_separator_back = intbyte(0);
 
     let mut h: Option<EdPoint> = Option::<EdPoint>::None;
 
     // TODO can we have while loops in hacspec?
     for ctr in 1..256 {
+        // this h 'inexisting variable'? hacspec not happy
         if h == Option::<EdPoint>::None {
-            let ctr_string = ByteSeq::new(ctr);
-            let suite_string = ByteSeq::new(SUITE_INT);
-            let hash_string = sha512(&suite_string
+        // if true {
+            let ctr_string = intbyte(ctr);
+            let hash_string = sha512(&suite_string()
                 .concat(&encode_to_curve_domain_separator_front)
                 .concat(encode_to_curve_salt)
                 .concat(alpha)
                 .concat(&ctr_string)
                 .concat(&encode_to_curve_domain_separator_back));
-            h = decompress(CompressedEdPoint::from_slice(&hash_string, 0, 64));
+            h = decompress(CompressedEdPoint::from_slice(&hash_string, 0, 32));
         }
     }
     let h = h.unwrap();
@@ -156,9 +167,8 @@ fn ecvrf_encode_to_curve_h2c_suite(
     encode_to_curve_salt: &ByteSeq, alpha: &ByteSeq
 ) -> EdPoint {
     let string_to_be_hashed = encode_to_curve_salt.concat(alpha);
-    let suite_string = ByteSeq::new(SUITE_INT);
     // TODO Faked, fix later:
-    let dst = suite_string;
+    let dst = suite_string();
     ed_encode_to_curve(&string_to_be_hashed, &dst)
 }
 
@@ -168,32 +178,41 @@ fn ecvrf_encode_to_curve_h2c_suite(
 // Both implementations should probably be available
 // 
 // This implements 5.1.6 of RFC8032
-fn ecvrf_nonce_generation(sk: SecretKey, h_string: &ByteSeq) -> Scalar {
+fn ecvrf_nonce_generation(
+    sk: SecretKey, h_string: &ByteSeq
+) -> Scalar {
     let hashed_sk_string = sha512(&sk.to_le_bytes());
     let truncated_hashed_sk_string = hashed_sk_string.slice(32,32);
     let k_string = sha512(&truncated_hashed_sk_string.concat(h_string));
     
-    // TODO check is this the correct q value?
-    Scalar::from_byte_seq_le(k_string)
+    // TODO should use a different q value
+    let nonce = BigScalar::from_byte_seq_le(k_string);
+    let nonceseq = nonce.to_byte_seq_le().slice(0, 32);
+    Scalar::from_byte_seq_le(nonceseq)
 }
 
 // See section 5.4.3
 fn ecvrf_challenge_generation(
     p1: EdPoint, p2: EdPoint, p3: EdPoint, p4: EdPoint, p5: EdPoint
 ) -> Scalar {
-    let challenge_generation_domain_separator_front = ByteSeq::new(2);
-    let challenge_generation_domain_separator_back = ByteSeq::new(0);
-    let suite_string = ByteSeq::new(SUITE_INT);
-    let string = suite_string
+    let challenge_generation_domain_separator_front = intbyte(2);
+    let challenge_generation_domain_separator_back = intbyte(0);
+    let string = suite_string()
         .concat(&challenge_generation_domain_separator_front)
-        .concat(&compress(p1).slice(0,32))
-        .concat(&compress(p2).slice(0,32))
-        .concat(&compress(p3).slice(0,32))
-        .concat(&compress(p4).slice(0,32))
-        .concat(&compress(p5).slice(0,32))
+        // .concat(&compress(p1).slice(0,32))
+        // .concat(&compress(p2).slice(0,32))
+        // .concat(&compress(p3).slice(0,32))
+        // .concat(&compress(p4).slice(0,32))
+        // .concat(&compress(p5).slice(0,32))
+        .concat(&encode(p1))
+        .concat(&encode(p2))
+        .concat(&encode(p3))
+        .concat(&encode(p4))
+        .concat(&encode(p5))
         .concat(&challenge_generation_domain_separator_back);
     let c_string = sha512(&string);
-    let truncated_c_string = c_string.slice(0, C_LEN-1);
+    let truncated_c_string = c_string.slice(0, C_LEN);
+    // TODO scalar ? check mod etc.
     Scalar::from_byte_seq_le(truncated_c_string)
 }
 
@@ -202,9 +221,8 @@ fn ecvrf_decode_proof(pi: &ByteSeq) -> ProofResult {
     let gamma_string = pi.slice(0, PT_LEN);
     let c_string = pi.slice(PT_LEN, C_LEN);
     let s_string = pi.slice(PT_LEN + C_LEN, Q_LEN);
-    let gamma = decompress(CompressedEdPoint::from_slice(&gamma_string, 0, 32));
-    
-    let gamma = gamma.ok_or(Error::InvalidProof)?;
+    let gamma = decompress(CompressedEdPoint::from_slice(&gamma_string, 0, 32))
+                .ok_or(Errorec::InvalidProof)?;
 
     let c = Scalar::from_byte_seq_le(c_string);
     let s = Scalar::from_byte_seq_le(s_string);
@@ -215,13 +233,22 @@ fn ecvrf_decode_proof(pi: &ByteSeq) -> ProofResult {
 
 // See section 5.4.5
 fn ecvrf_validate_key(y: PublicKey) -> BoolResult {
-    let y = decompress(y).ok_or(Error::InvalidPublicKey)?;
+    let y = decompress(y).ok_or(Errorec::InvalidPublicKey)?;
     let y_prime = point_mul_by_cofactor(y);
     if is_identity(y_prime) {
-        BoolResult::Err(Error::InvalidPublicKey)
+        BoolResult::Err(Errorec::InvalidPublicKey)
     } else {
         BoolResult::Ok(true)
     }
+}
+
+// Note, only one byte is allowed
+fn intbyte(y: usize) -> ByteSeq {
+    let mut x = Ed25519FieldElement::ZERO();
+    for _ctr in 0..y {
+        x = x + Ed25519FieldElement::ONE();
+    }
+    x.to_byte_seq_be().slice(31,1)
 }
 
 // TESTING =====================================================================
@@ -240,9 +267,71 @@ use quickcheck::*;
 mod tests {
     use super::*;
 
+    #[derive(Clone, Copy, Debug)]
+    struct Keyp {sk: SecretKey, pk: PublicKey}
+    #[derive(Clone, Copy, Debug)]
+    struct Wrapper(Ed25519FieldElement);
+
+    impl Arbitrary for Wrapper {
+        fn arbitrary(g: &mut Gen) -> Wrapper {
+            const NUM_BYTES: u32 = 31;
+            let mut a: [u8; NUM_BYTES as usize] = [0; NUM_BYTES as usize];
+            for i in 0..NUM_BYTES as usize {
+                a[i] = u8::arbitrary(g);
+            }
+            Wrapper(Ed25519FieldElement::from_byte_seq_be(
+                &Seq::<U8>::from_public_slice(&a)))
+        }
+    }
+    
+    public_nat_mod!(
+        type_name: KeyInt,
+        type_of_canvas: KeyCanvas,
+        bit_size_of_field: 256,
+        modulo_value: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    );
+
+    impl Arbitrary for Keyp {
+        fn arbitrary(g: &mut Gen) -> Keyp {
+            const NUM_BYTES: u32 = 32;
+            let mut a: [u8; NUM_BYTES as usize] = [0; NUM_BYTES as usize];
+            for i in 0..NUM_BYTES as usize {
+                a[i] = u8::arbitrary(g);
+            }
+
+            let bs = KeyInt::from_byte_seq_be(
+                &Seq::<U8>::from_public_slice(&a));
+            let bss = bs.to_byte_seq_be();
+            let sk = SerializedScalar::from_slice(&bss, 0, 32);
+
+            let pk = secret_to_public(sk);
+            Keyp {sk, pk}
+        }
+    }
+
+    #[quickcheck]
+    #[ignore]
+    fn ecvrf(kp: Keyp, alpha: Wrapper) -> bool {
+        let alpha = alpha.0.to_byte_seq_be();
+        let pi = ecvrf_prove(kp.sk, &alpha).unwrap();
+        let beta = ecvrf_proof_to_hash(&pi).unwrap();
+        let beta_prime = ecvrf_verify(kp.pk, &alpha, &pi, true).unwrap();
+        beta_prime == beta
+    }
+    
+    #[quickcheck]
+    // #[ignore]
+    fn neg_ecvrf(kp: Keyp, fake: Keyp, alpha: Wrapper) -> bool {
+        let alpha = alpha.0.to_byte_seq_be();
+        let pi = ecvrf_prove(kp.sk, &alpha).unwrap();
+        match ecvrf_verify(fake.pk, &alpha, &pi, true) {
+            Ok(_beta_prime) => panic!(),
+            Err(e) => matches!(e, Errorec::FailedVerify),
+        }
+    }
+
     #[test]
     fn test() {
-        let v = ByteSeq::new(0);
-        println!("{}", v.to_hex());
+        assert_eq!(intbyte(32), intbyte(30))
     } 
 }

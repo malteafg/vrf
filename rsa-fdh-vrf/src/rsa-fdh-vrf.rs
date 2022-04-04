@@ -2,16 +2,27 @@ use hacspec_lib::*;
 use hacspec_sha256::*;
 use rsa::*;
 
+const SUITE_INT: usize = 4usize;
+
+fn suite_string() -> ByteSeq { intbyte(SUITE_INT) }
+
 // VRF stuff ===================================================================
+// Note, only one byte is allowed
+fn intbyte(y: usize) -> ByteSeq {
+    let mut x = RSAInt::ZERO();
+    for _ctr in 0..y {
+        x = x.add_mod(RSAInt::ONE(), RSAInt::from_literal(256u128));
+    }
+    x.to_byte_seq_be().slice(31,1)
+}
 
 fn vrf_mgf1(n: RSAInt, alpha: &ByteSeq) -> ByteSeqResult {
-    let suite_string = i2osp(RSAInt::from_literal(1u128), 1u32)?;
-    let mgf_domain_separator = i2osp(RSAInt::from_literal(1u128), 1u32)?;
+    let mgf_domain_separator = intbyte(1);
 
-    let mgf_salt1 = i2osp(RSAInt::from_literal(4u128), 1u32)?;
+    let mgf_salt1 = i2osp(RSAInt::from_literal(BYTE_SIZE as u128), 4u32)?;
     let mgf_salt2 = i2osp(n, BYTE_SIZE)?;
     let mgf_salt = mgf_salt1.concat(&mgf_salt2);
-    let mgf_string = suite_string
+    let mgf_string = suite_string()
         .concat(&mgf_domain_separator
         .concat(&mgf_salt
         .concat(alpha)));
@@ -42,19 +53,15 @@ pub fn prove(sk: SK, alpha: &ByteSeq) -> ByteSeqResult {
 // Input: pi_string calculated in prove, or from verify
 // Output: beta_string
 pub fn proof_to_hash(pi_string: &ByteSeq) -> ByteSeqResult {
-    let suite_string = i2osp(RSAInt::from_literal(1u128), 1u32)?;
-
     // STEP 1
-    let proof_to_hash_domain_separator = i2osp(
-        RSAInt::from_literal(2u128), 1u32)?;
+    let proof_to_hash_domain_separator = intbyte(2);
 
     // STEP 2
-    let hash_string = suite_string
+    let hash_string = suite_string()
         .concat(&proof_to_hash_domain_separator
         .concat(pi_string));
 
     // STEP 3
-    // TODO this is stupid
     // sha256(&hash_string)
     ByteSeqResult::Ok(sha256(&hash_string).slice(0,32))
 }
@@ -78,12 +85,10 @@ pub fn verify(pk: PK, alpha: &ByteSeq, pi_string: &ByteSeq) -> ByteSeqResult {
     let m_prime = os2ip(&em_prime);
 
     // STEP 6
-    let mut result = ByteSeqResult::Ok(ByteSeq::new(0));
+    let mut result = ByteSeqResult::Err(Error::InvalidProof);
     if m == m_prime {
         let output = proof_to_hash(pi_string)?;
         result = ByteSeqResult::Ok(output)
-    } else {
-        result = ByteSeqResult::Err(Error::InvalidProof)
     }
     result
 }

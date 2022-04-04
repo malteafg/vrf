@@ -133,13 +133,13 @@ fn map_to_curve_elligator2(u: Ed25519FieldElement) -> Point {
     let zero = Ed25519FieldElement::ZERO();
 
     let mut x1 = (zero - j) * (one + (z * u * u)).inv();
-    println!("u: {}", u);
-    println!("uu: {}", (one + (z * u * u)));
+    // println!("u: {}", u);
+    // println!("uu: {}", (one + (z * u * u)));
     if x1 == zero {
         x1 = zero - j;
     }
     let gx1 = (x1 * x1 * x1) + (j * x1 * x1) + x1;
-    println!("gx1: {}", gx1);
+    // println!("gx1: {}", gx1);
     let x2 = zero - (x1 - j);
     let gx2 = (x2 * x2 * x2) + j * (x2 * x2) + x2;
     let mut x = zero;
@@ -152,7 +152,7 @@ fn map_to_curve_elligator2(u: Ed25519FieldElement) -> Point {
             y = zero - y;
         }
     } else {
-        println!("square gx1");
+        // println!("square gx1");
         x = x2;
         y = sqrt(gx2).unwrap();
         if !sgn0_m_eq_1(y) {
@@ -177,6 +177,22 @@ fn cmov(
     }
 }
 
+fn xor(a: bool, b: bool) -> bool {
+    if a {
+        if b {
+            false
+        } else {
+            true
+        }
+    } else {
+        if b {
+            true
+        } else {
+            false
+        }
+    }
+}
+
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#name-elligator-2-method-3
 fn map_to_curve_elligator2_straight(u: Ed25519FieldElement) -> Point {
     let j = Ed25519FieldElement::from_literal(J);
@@ -189,9 +205,9 @@ fn map_to_curve_elligator2_straight(u: Ed25519FieldElement) -> Point {
     let e1 = tv1 == zero - one;
     let tv1 = cmov(tv1, zero, e1);
     let x1 = tv1 + one;
-    println!("x1: {}", x1);
+    // println!("x1: {}", x1);
     let x1 = x1.inv();
-    println!("x1': {}", x1);
+    // println!("x1': {}", x1);
     let x1 = (zero - j) * x1;
     let gx1 = x1 + j;
     let gx1 = gx1 * x1;
@@ -204,7 +220,7 @@ fn map_to_curve_elligator2_straight(u: Ed25519FieldElement) -> Point {
     let y2 = cmov(gx2, gx1, e2);
     let y = sqrt(y2).unwrap();
     let e3 = sgn0_m_eq_1(y);
-    let y = cmov(y, zero - y, e2 ^ e3);
+    let y = cmov(y, zero - y, xor(e2, e3));
     let s = x;
     let t = y;
     
@@ -296,20 +312,7 @@ fn map_to_curve_elligator2_curve25519(u: Ed25519FieldElement) -> EdPoint {
     let xn = cmov(x2n, x1n, e3);
     let y = cmov(y2, y1, e3);
     let e4 = sgn0_m_eq_1(y);
-    // if e3 {
-    //     if e4 {
-    //         y = y;
-    //     } else {
-    //         y = zero - y;
-    //     }
-    // } else {
-    //     if e4 {
-    //         y = zero - y
-    //     } else {
-    //         y = y;
-    //     }
-    // }
-    let y = cmov(y, zero - y, e3 ^ e4);
+    let y = cmov(y, zero - y, xor(e3, e4));
 
     (xn, xd, y, one)
 }
