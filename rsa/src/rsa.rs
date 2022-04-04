@@ -167,81 +167,55 @@ mod tests {
 // RSA TESTS ===================================================================
     #[quickcheck]
     fn i2os2i(x: RSAInt) -> bool {
-        match i2osp(x, 128) {
-            Ok(i) => x == os2ip(&i),
-            Err(_e) => panic!(),
-        }
+        let s = i2osp(x, 128).unwrap();
+        let x_prime = os2ip(&s);
+        x_prime == x
     }
 
     #[quickcheck]
     #[ignore]
     fn rsaeprsadp(x: RSAInt, kp: Keyp) -> bool {
-        match rsaep((kp.n, kp.e), x) {
-            Ok(i) => 
-                match rsadp((kp.n, kp.d), i) {
-                    Ok(i) => i == x,
-                    Err(_e) => panic!(),
-                }
-            Err(_e) => panic!(),
-        }
+        let c = rsaep((kp.n, kp.e), x).unwrap();
+        let x_prime =  rsadp((kp.n, kp.d), c).unwrap();
+        x_prime == x
     }
 
     #[quickcheck]
     #[ignore]
     fn rsasp1rsavp1(x: RSAInt, kp: Keyp) -> bool {
-        match rsasp1((kp.n, kp.d), x) {
-            Ok(s) => 
-                match rsavp1((kp.n, kp.e), s) {
-                    Ok(i) => i == x,
-                    Err(_e) => panic!(),
-                }
-            Err(_e) => panic!(),
-        }
+        let s = rsasp1((kp.n, kp.d), x).unwrap();
+        let x_prime = rsavp1((kp.n, kp.e), s).unwrap();
+        x_prime == x
     }
 
     #[quickcheck]
     #[ignore]
     fn neg_rsaeprsadp(x: RSAInt, y: RSAInt, kp: Keyp) -> bool {
-        match rsaep((kp.n, kp.e), x) {
-            Ok(_i) => 
-                match rsadp((kp.n, kp.d), y) {
-                    Ok(i) => i != x,
-                    Err(_e) => panic!(),
-                }
-            Err(_e) => panic!(),
-        }
+        let x_prime = rsadp((kp.n, kp.d), y).unwrap();
+        x_prime != x
     }
 
     #[quickcheck]
     #[ignore]
     fn neg_rsasp1rsavp1(x: RSAInt, y: RSAInt, kp: Keyp) -> bool {
-        match rsasp1((kp.n, kp.d), x) {
-            Ok(_i) => 
-                match rsavp1((kp.n, kp.e), y) {
-                    Ok(i) => i != x,
-                    Err(_e) => panic!(),
-                }
-            Err(_e) => panic!(),
-        }
-    }
-
-    #[quickcheck]
-    fn negkey_rsaeprsadp(x: RSAInt, kp: Keyp, fake: Keyp) -> bool {
-        rsaep((kp.n, kp.e), x).unwrap() != rsadp((fake.n, fake.d), x).unwrap()
+        let x_prime = rsavp1((kp.n, kp.e), y).unwrap();
+        x_prime != x
     }
 
     #[quickcheck]
     #[ignore]
-    // NOTE, failed once with division by zero in rust biguint
+    fn negkey_rsaeprsadp(x: RSAInt, kp: Keyp, fake: Keyp) -> bool {
+        let c = rsaep((kp.n, kp.e), x).unwrap();
+        let x_prime = rsadp((fake.n, fake.d), c).unwrap_or_default();
+        x != x_prime
+    }
+
+    #[quickcheck]
+    #[ignore]
     fn negkey_rsasp1rsavp1(x: RSAInt, kp: Keyp, fake: Keyp) -> bool {
-        match rsasp1((kp.n, kp.d), x) {
-            Ok(_i) => 
-                match rsavp1((fake.n, fake.e), x) {
-                    Ok(i) => i != x,
-                    Err(_e) => panic!(),
-                }
-            Err(_e) => panic!(),
-        }
+        let s = rsasp1((kp.n, kp.d), x).unwrap();
+        let x_prime = rsavp1((fake.n, fake.e), s).unwrap_or_default();
+        x != x_prime
     }
 
     #[test]

@@ -170,53 +170,24 @@ mod tests {
 // VRF TESTS ===================================================================
 
     #[quickcheck]
+    #[ignore]
     fn rsafhdvrf(kp: Keyp, alpha: Wrapper) -> bool {
-        let alpha = alpha.0;
-        match i2osp(alpha, BYTE_SIZE) {
-            Ok(alpha) => {
-                match prove((kp.n, kp.d), &alpha) {
-                    Ok(pi) => {
-                        match proof_to_hash(&pi) {
-                            Ok(beta) => {
-                                match verify((kp.n, kp.e), &alpha, &pi) {
-                                    Ok(beta_v) => beta == beta_v,
-                                    Err(_e) => panic!(),
-                                }
-                            },
-                            Err(_e) => panic!(),
-                        }
-                    }
-                    Err(_e) => panic!(),
-                }
-            }
-            Err(_e) => panic!(),
-        }
+        let alpha = i2osp(alpha.0, BYTE_SIZE).unwrap();
+        let pi = prove((kp.n, kp.d), &alpha).unwrap();
+        let beta = proof_to_hash(&pi).unwrap();
+        let beta_prime = verify((kp.n, kp.e), &alpha, &pi).unwrap();
+        beta_prime == beta
     }
     
     #[quickcheck]
     #[ignore]
     fn negrsafhdvrf(kp: Keyp, fake: Keyp, alpha: Wrapper) -> bool {
-        let alpha = alpha.0;
-        match i2osp(alpha, BYTE_SIZE) {
-            Ok(alpha) => {
-                match prove((kp.n, kp.d), &alpha) {
-                    Ok(pi) => {
-                        match proof_to_hash(&pi) {
-                            Ok(_beta) => {
-                                match verify((fake.n, fake.e), &alpha, &pi) {
-                                    Ok(_beta_v) => panic!(),
-                                    Err(e) => matches!(
-                                        e, Error::InvalidProof 
-                                        | Error::MessageTooLargeVerify),
-                                }
-                            },
-                            Err(_e) => panic!(),
-                        }
-                    }
-                    Err(_e) => panic!(),
-                }
-            }
-            Err(_e) => panic!(),
+        let alpha = i2osp(alpha.0, BYTE_SIZE).unwrap();
+        let pi = prove((kp.n, kp.d), &alpha).unwrap();
+        match verify((fake.n, fake.e), &alpha, &pi) {
+            Ok(_beta_prime) => panic!(),
+            Err(e) => matches!(e, Error::InvalidProof 
+                                | Error::MessageTooLargeVerify),
         }
     }
 
