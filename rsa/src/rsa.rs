@@ -35,14 +35,11 @@ pub fn os2ip(x: &ByteSeq) -> RSAInt {
 }
 
 pub fn mgf1(mgf_seed: &ByteSeq, mask_len: usize) -> ByteSeqResult {
-    let mut result = ByteSeqResult::Ok(ByteSeq::new(0));
-    if mask_len >= 2usize^32usize * HLEN {
-        result = ByteSeqResult::Err(Error::InvalidLength)
-    } else {
+    let mut result = ByteSeqResult::Err(Error::InvalidLength);
+    if mask_len < 2usize^32usize * HLEN {
         let mut t = ByteSeq::new(0);
         for i in 0..((mask_len + 32) / 32) {
-            let x = i2osp(RSAInt::from_literal(
-                i as u128), 4u32)?;
+            let x = i2osp(RSAInt::from_literal(i as u128), 4u32)?;
             t = t.concat(&sha256(&mgf_seed.concat(&x)));
         }
         result = ByteSeqResult::Ok(t.slice(0, mask_len))
