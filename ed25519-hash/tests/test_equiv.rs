@@ -30,11 +30,6 @@ fn test_equiv_armfazh(msg: String) -> bool {
     );
 
     // normalize
-    let px = p2.0 * p2.2.inv();
-    let py = p2.1 * p2.2.inv();
-    let pz = Ed25519FieldElement::ONE();
-    let pt = px * py;
-    let p2 = (px, py, pz, pt);
-
+    let p2 = normalize(p2);
     p1 == p2
 }

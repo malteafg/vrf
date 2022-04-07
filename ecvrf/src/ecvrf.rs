@@ -38,13 +38,15 @@ pub fn ecvrf_prove(
     let x = Scalar::from_byte_seq_le(x);
     let pk = secret_to_public(sk);
     let y = decompress(secret_to_public(sk)).ok_or(Errorec::InvalidPublicKey)?;
+
     let pkd = decompress(pk).unwrap();
-    assert_eq!(point_mul(x, base), pkd);
+    assert_eq!(normalize(point_mul(x, base)), normalize(pkd));
 
     // STEP 2
     let encode_to_curve_salt = pk.slice(0,32);
     let h = ecvrf_encode_to_curve_h2c_suite(
         &encode_to_curve_salt, alpha);
+    assert_eq!(encode(h), ByteSeq::from_hex("b8066ebbb706c72b64390324e4a3276f129569eab100c26b9f05011200c1bad9"));
 
     // STEP 3
     let h_string = encode(h);
@@ -56,9 +58,11 @@ pub fn ecvrf_prove(
     let k = ecvrf_nonce_generation(sk, &h_string);
 
     // STEP 6
-    let c = ecvrf_challenge_generation(
-        y, h, gamma, point_mul(k, base), 
-        point_mul(k, h));
+    let u = point_mul(k, base);
+    let v = point_mul(k, h);
+    let c = ecvrf_challenge_generation(y, h, gamma, u, v);
+    assert_eq!(encode(u), ByteSeq::from_hex("762f5c178b68f0cddcc1157918edf45ec334ac8e8286601a3256c3bbf858edd9"));
+    assert_eq!(encode(v), ByteSeq::from_hex("4652eba1c4612e6fce762977a59420b451e12964adbe4fbecd58a7aeff5860af"));
 
     // STEP 7
     let s = k + c * x;
@@ -171,7 +175,9 @@ fn ecvrf_encode_to_curve_h2c_suite(
 ) -> EdPoint {
     let string_to_be_hashed = encode_to_curve_salt.concat(alpha);
     // TODO Faked, fix later:
-    let dst = suite_string();
+    let ecvrfstr = ByteSeq::from_public_slice(b"ECVRF_");
+    let h2c_suite_id_string = ByteSeq::from_public_slice(b"edwards25519_XMD:SHA-512_ELL2_NU_");
+    let dst = ecvrfstr.concat(&h2c_suite_id_string).concat(&suite_string());
     ed_encode_to_curve(&string_to_be_hashed, &dst)
 }
 
@@ -213,9 +219,10 @@ fn ecvrf_challenge_generation(
         .concat(&encode(p4))
         .concat(&encode(p5))
         .concat(&challenge_generation_domain_separator_back);
+    // assert_eq!(string, ByteSeq::from_hex("0a"));
     let c_string = sha512(&string);
     let truncated_c_string = c_string.slice(0, C_LEN);
-    // TODO should not be a problem as scalar mod is bigger than 2^128-1
+    
     Scalar::from_byte_seq_le(truncated_c_string)
 }
 
@@ -353,6 +360,7 @@ mod tests {
         assert_eq!(pi, pitest);
 
         let beta = ecvrf_proof_to_hash(&pi).unwrap();
+
         let beta_prime = ecvrf_verify(pk, &alpha, &pi, true).unwrap();
         assert_eq!(beta_prime, beta);
     }
