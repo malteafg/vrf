@@ -17,3 +17,6 @@ hacspec-curve25519 = { path = "../../hacspec/examples/curve25519" }
 [dev-dependencies]
 quickcheck = "1"
 quickcheck_macros = "1"
+h2c-rust-ref = { git = "https://github.com/armfazh/h2c-rust-ref" }
+redox-ecc = { git = "https://github.com/armfazh/redox-ecc" }
+

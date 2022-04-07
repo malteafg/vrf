@@ -7,7 +7,6 @@ const B_IN_BYTES: usize = 64usize;
 const S_IN_BYTES: usize = 128usize;
 const L: usize = 48usize;
 const J: u128 = 486662u128;
-const K: u128 = 1u128;
 const Z: u128 = 2u128;
 
 array!(ArrEd25519FieldElement, 4, U64);
@@ -53,6 +52,7 @@ const P_5_8: ArrEd25519FieldElement = ArrEd25519FieldElement(secret_array!(
     ]
 ));
 
+// HASH-TO-FIELD ===============================================================
 // taken from bls12-381-hash.rs
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#section-5.4.1
 pub fn expand_message_xmd(
@@ -93,7 +93,6 @@ pub fn ed_hash_to_field(
 ) -> Seq<Ed25519FieldElement> {
     let len_in_bytes = count * L; // count * m * L
     let uniform_bytes = expand_message_xmd(msg, dst, len_in_bytes);
-    // let uniform_bytes = ByteSeq::from_hex("d620782a206d9de584b74e23ae5ee1db5ca5298b3fc527c4867f049dee6dd419b3674967bd614890f621c128d72269ae");
     let mut output = Seq::<Ed25519FieldElement>::new(count);
 
     for i in 0..count {
@@ -107,6 +106,7 @@ pub fn ed_hash_to_field(
     output
 }
 
+// AUXILIARY FUNCTIONS =========================================================
 // adapted from bls12-381-hash.rs
 fn ed_is_square(x: Ed25519FieldElement) -> bool {
     let c1 = Ed25519FieldElement::from_byte_seq_be(&P_1_2.to_be_bytes()); // (p - 1) / 2
@@ -124,10 +124,83 @@ fn ed_clear_cofactor(x: EdPoint) -> EdPoint {
     point_mul_by_cofactor(x)
 }
 
+fn cmov(
+    a: Ed25519FieldElement, b: Ed25519FieldElement, c: bool
+) -> Ed25519FieldElement {
+    if c {
+        b
+    } else {
+        a
+    }
+}
+
+fn xor(a: bool, b: bool) -> bool {
+    if a {
+        if b {
+            false
+        } else {
+            true
+        }
+    } else {
+        if b {
+            true
+        } else {
+            false
+        }
+    }
+}
+
+// fn inv0(x: Ed25519FieldElement) -> Ed25519FieldElement {
+//     let one = Ed25519FieldElement::ONE();
+//     let zero = Ed25519FieldElement::ZERO();
+//     if (x == zero) {
+//         zero
+//     } else {
+//         x.pow(zero)
+//     }
+// }
+
+// https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#appendix-D.1-13
+fn monty_to_edw(p: Point) -> EdPoint {
+    let (s,t) = p;
+    let s = Ed25519FieldElement::from_byte_seq_be(&s.to_byte_seq_be());
+    let t = Ed25519FieldElement::from_byte_seq_be(&t.to_byte_seq_be());
+    let one = Ed25519FieldElement::ONE();
+    let zero = Ed25519FieldElement::ZERO();
+
+    println!("t: {}", t);
+    let tv1 = s + one;
+    let tv2 = tv1 * t;
+    let tv2 = tv2.inv();
+    let v = tv2 * tv1;
+    let v = v * s;
+    let w = tv2 * t;
+    let tv1 = s - one;
+    let w = w * tv1;
+    let e = tv2 == zero;
+    cmov(w, one, e);
+    
+    (v, w, one, v * w)
+}
+
+// does not convert the identity point
+fn fake_monty_to_edw(p: Point) -> EdPoint {
+    let (s,t) = p;
+    let s = Ed25519FieldElement::from_byte_seq_be(&s.to_byte_seq_be());
+    let t = Ed25519FieldElement::from_byte_seq_be(&t.to_byte_seq_be());
+    let one = Ed25519FieldElement::ONE();
+
+    let v = s * t.inv();
+    let w = (s - one) * (s + one).inv();
+
+    (v, w, one, v * w)
+}
+
+// MAP-TO-CURVES ===============================================================
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#section-6.7.1
+// non-straight
 fn map_to_curve_elligator2(u: Ed25519FieldElement) -> Point {
     let j = Ed25519FieldElement::from_literal(J);
-    let k = Ed25519FieldElement::from_literal(K);
     let z = Ed25519FieldElement::from_literal(Z);
     let one = Ed25519FieldElement::ONE();
     let zero = Ed25519FieldElement::ZERO();
@@ -159,50 +232,26 @@ fn map_to_curve_elligator2(u: Ed25519FieldElement) -> Point {
             y = zero - y;
         }
     }
-    let s = x * k;
-    let t = y * k;
+    let s = x;
+    let t = y;
 
-    // TODO this is stupid
     (X25519FieldElement::from_byte_seq_be(&s.to_byte_seq_be()),
     X25519FieldElement::from_byte_seq_be(&t.to_byte_seq_be()))
 }
 
-fn cmov(
-    a: Ed25519FieldElement, b: Ed25519FieldElement, c: bool
-) -> Ed25519FieldElement {
-    if c {
-        b
-    } else {
-        a
-    }
-}
-
-fn xor(a: bool, b: bool) -> bool {
-    if a {
-        if b {
-            false
-        } else {
-            true
-        }
-    } else {
-        if b {
-            true
-        } else {
-            false
-        }
-    }
-}
-
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#name-elligator-2-method-3
+// straight F.3
 fn map_to_curve_elligator2_straight(u: Ed25519FieldElement) -> Point {
     let j = Ed25519FieldElement::from_literal(J);
     let z = Ed25519FieldElement::from_literal(Z);
     let one = Ed25519FieldElement::ONE();
     let zero = Ed25519FieldElement::ZERO();
 
+    // println!("u: {}", u);
     let tv1 = u * u;
     let tv1 = z * tv1;
     let e1 = tv1 == zero - one;
+    // println!("e1: {}", e1);
     let tv1 = cmov(tv1, zero, e1);
     let x1 = tv1 + one;
     // println!("x1: {}", x1);
@@ -228,41 +277,9 @@ fn map_to_curve_elligator2_straight(u: Ed25519FieldElement) -> Point {
     X25519FieldElement::from_byte_seq_be(&t.to_byte_seq_be()))
 }
 
-// https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#appendix-D.1-13
-fn monty_to_edw(p: Point) -> EdPoint {
-    let (s,t) = p;
-    let one = X25519FieldElement::ONE();
-    let zero = X25519FieldElement::ZERO();
-
-    let tv1 = s + one;
-    let tv2 = tv1 * t;
-    let tv2 = tv2.inv();
-    let v = tv2 * tv1;
-    let v = v * s;
-    let w = tv2 * t;
-    let tv1 = s - one;
-    let mut w = w * tv1;
-    let e = tv2 == zero;
-    // TODO check if this is constant time implementation
-    if e {
-        w = one
-    }
-    
-    (Ed25519FieldElement::from_byte_seq_be(&v.to_byte_seq_be()),
-    Ed25519FieldElement::from_byte_seq_be(&w.to_byte_seq_be()),
-    Ed25519FieldElement::from_byte_seq_be(&one.to_byte_seq_be()),
-    Ed25519FieldElement::from_byte_seq_be(&(v * w).to_byte_seq_be()))
-}
-
-// https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#section-6.8.2
-fn map_to_curve_elligator2_edwards(u: Ed25519FieldElement) -> EdPoint {
-    let st = map_to_curve_elligator2_straight(u);
-    // monty_to_edw gives the extended homogeneous coordinates
-    monty_to_edw(st)
-}
-
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#name-curve25519-q-5-mod-8-k-1
 // NOTE: returns a curve25519 point, even though represented as EdPoint
+// OPTIMIZED
 fn map_to_curve_elligator2_curve25519(u: Ed25519FieldElement) -> EdPoint {
     let j = Ed25519FieldElement::from_literal(J);
     let z = Ed25519FieldElement::from_literal(Z);
@@ -318,6 +335,7 @@ fn map_to_curve_elligator2_curve25519(u: Ed25519FieldElement) -> EdPoint {
 }
 
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#name-edwards25519
+// Optimized G.2
 fn map_to_curve_elligator2_edwards25519(u: Ed25519FieldElement) -> EdPoint {
     let j = Ed25519FieldElement::from_literal(J);
     let zero = Ed25519FieldElement::ZERO();
@@ -338,12 +356,23 @@ fn map_to_curve_elligator2_edwards25519(u: Ed25519FieldElement) -> EdPoint {
     let yn = cmov(yn, one, e);
     let yd = cmov(yd, one, e);
 
-    (xn, xd, yn, yd)
+    let x = xn * xd.inv();
+    let y = yn * yd.inv();
+    (x, y, one, x * y)
+}
+
+// MAIN FUNCTIONS ==============================================================
+// https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#section-6.8.2
+fn map_to_curve_elligator2_edwards(u: Ed25519FieldElement) -> EdPoint {
+    let st = map_to_curve_elligator2_straight(u);
+    // monty_to_edw gives the extended homogeneous coordinates
+    monty_to_edw(st)
 }
 
 //  https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#section-3
 pub fn ed_encode_to_curve(msg: &ByteSeq, dst: &ByteSeq) -> EdPoint {
     let u = ed_hash_to_field(msg, dst, 1);
+    // let q = map_to_curve_elligator2_edwards(u[0]);
     let q = map_to_curve_elligator2_edwards25519(u[0]);
     let p = ed_clear_cofactor(q);
     p
@@ -381,7 +410,7 @@ mod tests {
 
 // Hash to curve tests =========================================================
     #[quickcheck]
-    #[ignore]
+    // #[ignore]
     fn point_on_curve(msg: Wrapper) -> bool {
         let dst = ByteSeq::from_public_slice(
             b"ECVRF_edwards25519_XMD:SHA-512_ELL2_NU_");
@@ -397,8 +426,19 @@ mod tests {
         lh == rh
     }
 
-    #[test]
+    #[quickcheck]
     // #[ignore]
+    fn no_collision(msg1: Wrapper, msg2: Wrapper) -> bool {
+        let dst = ByteSeq::from_public_slice(
+            b"ECVRF_edwards25519_XMD:SHA-512_ELL2_NU_");
+        let dst = dst.concat(&ByteSeq::from_hex("04"));
+        let p1 = ed_encode_to_curve(&msg1.0, &dst);
+        let p2 = ed_encode_to_curve(&msg2.0, &dst);
+        p1 != p2
+    }
+
+    #[test]
+    #[ignore]
     fn abc_test() {
         let msg = ByteSeq::from_public_slice(b"abc");
         let dst = ByteSeq::from_public_slice(
@@ -409,13 +449,34 @@ mod tests {
         assert_eq!(u[0usize], Ed25519FieldElement::from_hex( 
             "09cfa30ad79bd59456594a0f5d3a76f6b71c6787b04de98be5cd201a556e253b"));
         
-        let q = map_to_curve_elligator2_edwards25519(u[0usize]);
-        let (qx, qy, qz, _) = q;
-        let qz_inv = qz.inv();
-        let qx = qx * qz_inv;
-        let qy = qy * qz_inv;
+        let (s, t) = map_to_curve_elligator2(u[0usize]);
+        println!("s nonstraight: {}", s);
+        println!("t nonstraight: {}", t);
+        monty_to_edw((s, t));
+
+        println!("\n\n straight stuff:");
+        
+        let (s_s, t_s) = map_to_curve_elligator2_straight(u[0usize]);
+        println!("s straight: {}", s_s);
+        println!("t straight: {}", t_s);
+
+        let q = monty_to_edw((s_s, t_s));
+        let (qx, qy, _, _) = q;
+        println!("qx: {}", qx);
+        println!("qy: {}", qy);
+
+        let q = fake_monty_to_edw((s_s, t_s));
+        let (qx, qy, _, _) = q;
+        println!("qx fake: {}", qx);
+        println!("qy fake: {}", qy);
+
+        // assert_eq!(s, s_s);
+        // assert_eq!(t, t_s);
         assert_eq!(qx.to_byte_seq_be().to_hex(), "333e41b61c6dd43af220c1ac34a3663e1cf537f996bab50ab66e33c4bd8e4e19");
         assert_eq!(qy.to_byte_seq_be().to_hex(), "51b6f178eb08c4a782c820e306b82c6e273ab22e258d972cd0c511787b2a3443");
+
+        // qx 23 177 953 318 979 605 650 317 170 340 695 869 570 245 232 951 233 222 690 142 303 031 689 541 996 057
+        // qy 36 960 573 481 849 415 552 737 969 338 192 247 225 895 396 748 735 107 121 224 586 352 183 973 917 763
 
         // let (x, y, z, _) = ed_clear_cofactor(q);
         // let z_inv = z.inv();
@@ -443,9 +504,129 @@ mod tests {
     #[ignore]
     fn test_g1() {
         let u = Ed25519FieldElement::from_hex("30f037b9745a57a9a2b8a68da81f397c39d46dee9d047f86c427c53f8b29a55c");
-        // let ou = ed_hash_to_field(&ByteSeq::from_public_slice(b""), &ByteSeq::from_public_slice(b""), 1);
-        // assert_eq!(u, ou[0]);
+        let ou = ed_hash_to_field(&ByteSeq::from_public_slice(b""), &ByteSeq::from_public_slice(b""), 1);
+        assert_eq!(u, ou[0]);
         let q = map_to_curve_elligator2_edwards(u);
+    }
+
+    // #[test]
+    // fn testarmfazh() {
+        // let file = File::open("../h2c-rust-ref/tests/testdata/curve25519_XMD-SHA-512_ELL2_NU_.json").unwrap();
+        // let u: SuiteVector = serde_json::from_reader(BufReader::new(file)).unwrap();
+        // let key = u.ciphersuite.clone();
+        // let mut test = Test {
+        //     name: u.ciphersuite.clone(),
+        //     data: u,
+        //     kind: String::default(),
+        //     is_ignored: false,
+        //     is_bench: false,
+        // };
+    // }
+
+// OPTIMIZED UNIT TESTS ========================================================
+    #[test]
+    // #[ignore]
+    fn empty_test_optimized() {
+        let one = Ed25519FieldElement::ONE();
+        let msg = ByteSeq::from_public_slice(b"");
+        let dst = ByteSeq::from_public_slice(b"QUUX-V01-CS02-with-edwards25519_XMD:SHA-512_ELL2_NU_");
+        let u = ed_hash_to_field(&msg, &dst, 1);
+        assert_eq!(u[0usize].to_byte_seq_be().to_hex(), "7f3e7fb9428103ad7f52db32f9df32505d7b427d894c5093f7a0f0374a30641d");
+        
+        let (qx, qy, _, _) = map_to_curve_elligator2_edwards25519(u[0usize]);
+        assert_eq!(qx.to_byte_seq_be().to_hex(), "42836f691d05211ebc65ef8fcf01e0fb6328ec9c4737c26050471e50803022eb");
+        assert_eq!(qy.to_byte_seq_be().to_hex(), "22cb4aaa555e23bd460262d2130d6a3c9207aa8bbb85060928beb263d6d42a95");
+
+        let (px, py, pz, _) = ed_clear_cofactor((qx, qy, one, qx * qy));
+        let px = px * pz.inv();
+        let py = py * pz.inv();
+
+        assert_eq!(px.to_byte_seq_be().to_hex(), "1ff2b70ecf862799e11b7ae744e3489aa058ce805dd323a936375a84695e76da");
+        assert_eq!(py.to_byte_seq_be().to_hex(), "222e314d04a4d5725e9f2aff9fb2a6b69ef375a1214eb19021ceab2d687f0f9b");
+    }
+
+    #[test]
+    // #[ignore]
+    fn abc_test_optimized() {
+        let one = Ed25519FieldElement::ONE();
+        let msg = ByteSeq::from_public_slice(b"abc");
+        let dst = ByteSeq::from_public_slice(b"QUUX-V01-CS02-with-edwards25519_XMD:SHA-512_ELL2_NU_");
+        let u = ed_hash_to_field(&msg, &dst, 1);
+        assert_eq!(u[0usize].to_byte_seq_be().to_hex(), "09cfa30ad79bd59456594a0f5d3a76f6b71c6787b04de98be5cd201a556e253b");
+        
+        let (qx, qy, _, _) = map_to_curve_elligator2_edwards25519(u[0usize]);
+        assert_eq!(qx.to_byte_seq_be().to_hex(), "333e41b61c6dd43af220c1ac34a3663e1cf537f996bab50ab66e33c4bd8e4e19");
+        assert_eq!(qy.to_byte_seq_be().to_hex(), "51b6f178eb08c4a782c820e306b82c6e273ab22e258d972cd0c511787b2a3443");
+
+        let (px, py, pz, _) = ed_clear_cofactor((qx, qy, one, qx * qy));
+        let px = px * pz.inv();
+        let py = py * pz.inv();
+
+        assert_eq!(px.to_byte_seq_be().to_hex(), "5f13cc69c891d86927eb37bd4afc6672360007c63f68a33ab423a3aa040fd2a8");
+        assert_eq!(py.to_byte_seq_be().to_hex(), "67732d50f9a26f73111dd1ed5dba225614e538599db58ba30aaea1f5c827fa42");
+    }
+    
+    #[test]
+    // #[ignore]
+    fn abcdef0123456789_test_optimized() {
+        let one = Ed25519FieldElement::ONE();
+        let msg = ByteSeq::from_public_slice(b"abcdef0123456789");
+        let dst = ByteSeq::from_public_slice(b"QUUX-V01-CS02-with-edwards25519_XMD:SHA-512_ELL2_NU_");
+        let u = ed_hash_to_field(&msg, &dst, 1);
+        assert_eq!(u[0usize].to_byte_seq_be().to_hex(), "475ccff99225ef90d78cc9338e9f6a6bb7b17607c0c4428937de75d33edba941");
+        
+        let (qx, qy, _, _) = map_to_curve_elligator2_edwards25519(u[0usize]);
+        assert_eq!(qx.to_byte_seq_be().to_hex(), "55186c242c78e7d0ec5b6c9553f04c6aeef64e69ec2e824472394da32647cfc6");
+        assert_eq!(qy.to_byte_seq_be().to_hex(), "5b9ea3c265ee42256a8f724f616307ef38496ef7eba391c08f99f3bea6fa88f0");
+
+        let (px, py, pz, _) = ed_clear_cofactor((qx, qy, one, qx * qy));
+        let px = px * pz.inv();
+        let py = py * pz.inv();
+
+        assert_eq!(px.to_byte_seq_be().to_hex(), "1dd2fefce934ecfd7aae6ec998de088d7dd03316aa1847198aecf699ba6613f1");
+        assert_eq!(py.to_byte_seq_be().to_hex(), "2f8a6c24dd1adde73909cada6a4a137577b0f179d336685c4a955a0a8e1a86fb");
+    }
+
+    #[test]
+    // #[ignore]
+    fn q128_q_test_optimized() {
+        let one = Ed25519FieldElement::ONE();
+        let msg = ByteSeq::from_public_slice(b"q128_qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq");
+        let dst = ByteSeq::from_public_slice(b"QUUX-V01-CS02-with-edwards25519_XMD:SHA-512_ELL2_NU_");
+        let u = ed_hash_to_field(&msg, &dst, 1);
+        assert_eq!(u[0usize].to_byte_seq_be().to_hex(), "049a1c8bd51bcb2aec339f387d1ff51428b88d0763a91bcdf6929814ac95d03d");
+        
+        let (qx, qy, _, _) = map_to_curve_elligator2_edwards25519(u[0usize]);
+        assert_eq!(qx.to_byte_seq_be().to_hex(), "024b6e1621606dca8071aa97b43dce4040ca78284f2a527dcf5d0fbfac2b07e7");
+        assert_eq!(qy.to_byte_seq_be().to_hex(), "5102353883d739bdc9f8a3af650342b171217167dcce34f8db57208ec1dfdbf2");
+
+        let (px, py, pz, _) = ed_clear_cofactor((qx, qy, one, qx * qy));
+        let px = px * pz.inv();
+        let py = py * pz.inv();
+
+        assert_eq!(px.to_byte_seq_be().to_hex(), "35fbdc5143e8a97afd3096f2b843e07df72e15bfca2eaf6879bf97c5d3362f73");
+        assert_eq!(py.to_byte_seq_be().to_hex(), "2af6ff6ef5ebba128b0774f4296cb4c2279a074658b083b8dcca91f57a603450");
+    }
+
+    #[test]
+    // #[ignore]
+    fn a512_a_test_optimized() {
+        let one = Ed25519FieldElement::ONE();
+        let msg = ByteSeq::from_public_slice(b"a512_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        let dst = ByteSeq::from_public_slice(b"QUUX-V01-CS02-with-edwards25519_XMD:SHA-512_ELL2_NU_");
+        let u = ed_hash_to_field(&msg, &dst, 1);
+        assert_eq!(u[0usize].to_byte_seq_be().to_hex(), "3cb0178a8137cefa5b79a3a57c858d7eeeaa787b2781be4a362a2f0750d24fa0");
+        
+        let (qx, qy, _, _) = map_to_curve_elligator2_edwards25519(u[0usize]);
+        assert_eq!(qx.to_byte_seq_be().to_hex(), "3e6368cff6e88a58e250c54bd27d2c989ae9b3acb6067f2651ad282ab8c21cd9");
+        assert_eq!(qy.to_byte_seq_be().to_hex(), "38fb39f1566ca118ae6c7af42810c0bb9767ae5960abb5a8ca792530bfb9447d");
+
+        let (px, py, pz, _) = ed_clear_cofactor((qx, qy, one, qx * qy));
+        let px = px * pz.inv();
+        let py = py * pz.inv();
+
+        assert_eq!(px.to_byte_seq_be().to_hex(), "6e5e1f37e99345887fc12111575fc1c3e36df4b289b8759d23af14d774b66bff");
+        assert_eq!(py.to_byte_seq_be().to_hex(), "2c90c3d39eb18ff291d33441b35f3262cdd307162cc97c31bfcc7a4245891a37");
     }
     
 }

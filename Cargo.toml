@@ -1,3 +1,5 @@
 [workspace]
-members = ["rsa", "rsa-fdh-vrf", "ecvrf", "ed25519-hash"]
-default-members = ["rsa", "rsa-fdh-vrf", "ecvrf", "ed25519-hash"]
+members = [
+    "rsa", "rsa-fdh-vrf", "ecvrf", "ed25519-hash"]
+default-members = [
+    "rsa", "rsa-fdh-vrf", "ecvrf", "ed25519-hash"]
