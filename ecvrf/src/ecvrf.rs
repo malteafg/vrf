@@ -21,7 +21,7 @@ pub type BoolResult = Result<bool, Errorec>;
 const C_LEN: usize = 16usize;
 const PT_LEN: usize = 32usize;
 const Q_LEN: usize = 32usize;
-const SUITE_INT: usize = 4usize;
+const SUITE_INT: usize = 3usize;
 
 fn suite_string() -> ByteSeq { intbyte(SUITE_INT) }
     
@@ -39,20 +39,23 @@ pub fn ecvrf_prove(
     let pk = secret_to_public(sk);
     let y = decompress(secret_to_public(sk)).ok_or(Errorec::InvalidPublicKey)?;
 
-    let pkd = decompress(pk).unwrap();
-    assert_eq!(normalize(point_mul(x, base)), normalize(pkd));
+    // let pkd = decompress(pk).unwrap();
+    // assert_eq!(normalize(point_mul(x, base)), normalize(pkd));
 
     // STEP 2
     let encode_to_curve_salt = pk.slice(0,32);
-    let h = ecvrf_encode_to_curve_h2c_suite(
-        &encode_to_curve_salt, alpha);
-    assert_eq!(encode(h), ByteSeq::from_hex("b8066ebbb706c72b64390324e4a3276f129569eab100c26b9f05011200c1bad9"));
+    //let h = ecvrf_encode_to_curve_h2c_suite(&encode_to_curve_salt, alpha);
+    // assert_eq!(encode(h), ByteSeq::from_hex("b8066ebbb706c72b64390324e4a3276f129569eab100c26b9f05011200c1bad9"));
+
+    let h = ecvrf_encode_to_curve_try_and_increment(&encode_to_curve_salt, alpha);
+    // assert_eq!(encode(h), ByteSeq::from_hex("91bbed02a99461df1ad4c6564a5f5d829d0b90cfc7903e7a5797bd658abf3318"));
 
     // STEP 3
     let h_string = encode(h);
 
     // STEP 4
     let gamma = point_mul(x, h);
+    // assert_eq!(encode(gamma).to_hex(), "00");
 
     // STEP 5
     let k = ecvrf_nonce_generation(sk, &h_string);
@@ -61,11 +64,11 @@ pub fn ecvrf_prove(
     let u = point_mul(k, base);
     let v = point_mul(k, h);
     let c = ecvrf_challenge_generation(y, h, gamma, u, v);
-    assert_eq!(encode(u), ByteSeq::from_hex("762f5c178b68f0cddcc1157918edf45ec334ac8e8286601a3256c3bbf858edd9"));
-    assert_eq!(encode(v), ByteSeq::from_hex("4652eba1c4612e6fce762977a59420b451e12964adbe4fbecd58a7aeff5860af"));
+    //assert_eq!(encode(u), ByteSeq::from_hex("762f5c178b68f0cddcc1157918edf45ec334ac8e8286601a3256c3bbf858edd9"));
+    //assert_eq!(encode(v), ByteSeq::from_hex("4652eba1c4612e6fce762977a59420b451e12964adbe4fbecd58a7aeff5860af"));
 
     // STEP 7
-    let s = k + c * x;
+    let s = k + (c * x);
 
     // STEP 8 and 9
     ByteSeqResult::Ok(encode(gamma)
@@ -77,7 +80,8 @@ pub fn ecvrf_prove(
 pub fn ecvrf_proof_to_hash(pi: &ByteSeq) -> ByteSeqResult {
     // STEP 1, 2 and 3
     let (gamma, _, _) = ecvrf_decode_proof(pi)?;
-
+    // assert_eq!(encode(gamma).to_hex(), "7d9c633ffeee27349264cf5c667579fc583b4bda63ab71d001f89c10003ab46f");
+    
     // STEP 4 + 5
     let proof_to_hash_domain_separator_front = intbyte(3);
     let proof_to_hash_domain_separator_back = intbyte(0);
@@ -87,7 +91,6 @@ pub fn ecvrf_proof_to_hash(pi: &ByteSeq) -> ByteSeqResult {
         .concat(&proof_to_hash_domain_separator_front)
         .concat(&encode(point_mul_by_cofactor(gamma)))
         // .concat(&compress(point_mul_by_cofactor(gamma)).slice(0,32))
-        // slice because sha512 returns digest instead of byteseq
         .concat(&proof_to_hash_domain_separator_back)).slice(0,64))
 }
 
@@ -107,24 +110,27 @@ pub fn ecvrf_verify(
 
     // STEP 4, 5 and 6
     let (gamma, c, s) = ecvrf_decode_proof(pi)?;
+    // let c_str = c.to_byte_seq_le().slice(0, C_LEN);
+    // assert_eq!(encode(gamma).concat(&c_str).concat(&s.to_byte_seq_le()), ByteSeq::from_hex("7d9c633ffeee27349264cf5c667579fc583b4bda63ab71d001f89c10003ab46f14adf9a3cd8b8412d9038531e865c341cafa73589b023d14311c331a9ad15ff2fb37831e00f0acaa6d73bc9997b06501"));
+    // assert_eq!(encode(gamma).concat(&c_str).concat(&s.to_byte_seq_le()), *pi);
 
     // STEP 7
     let encode_to_curve_salt = pk.slice(0,32);
-    let h = ecvrf_encode_to_curve_h2c_suite(
-        &encode_to_curve_salt, alpha);
+    // let h = ecvrf_encode_to_curve_h2c_suite(&encode_to_curve_salt, alpha);
+    let h = ecvrf_encode_to_curve_try_and_increment(&encode_to_curve_salt, alpha);
+    // assert_eq!(encode(h), ByteSeq::from_hex("b8066ebbb706c72b64390324e4a3276f129569eab100c26b9f05011200c1bad9"));
 
-    // TODO point mul uses scalar
     // STEP 8
-    let u = point_add(point_mul(s, base), point_neg(point_mul(c,y)));
+    let u = point_add(point_mul(s, base), point_neg(point_mul(c, y)));
 
     // STEP 9
-    let v = point_add(point_mul(s, h), point_neg(point_mul(c,gamma)));
+    let v = point_add(point_mul(s, h), point_neg(point_mul(c, gamma)));
+    // assert_eq!(encode(u), ByteSeq::from_hex("762f5c178b68f0cddcc1157918edf45ec334ac8e8286601a3256c3bbf858edd9"));
+    // assert_eq!(encode(v), ByteSeq::from_hex("4652eba1c4612e6fce762977a59420b451e12964adbe4fbecd58a7aeff5860af"));
 
     // STEP 10
     let c_prime = ecvrf_challenge_generation(y, h, gamma, u, v);
 
-    assert_eq!(c, c_prime);
-    
     // STEP 11
     // print!("\nc:       {} \n", c);
     // print!("c_prime: {} \n", c_prime);
@@ -154,8 +160,7 @@ fn ecvrf_encode_to_curve_try_and_increment(
     for ctr in 1..256 {
         // this h 'inexisting variable'? hacspec not happy
         if h == Option::<EdPoint>::None {
-        // if true {
-            let ctr_string = intbyte(ctr);
+            let ctr_string = intbyte(ctr-1);
             let hash_string = sha512(&suite_string()
                 .concat(&encode_to_curve_domain_separator_front)
                 .concat(encode_to_curve_salt)
@@ -194,7 +199,6 @@ fn ecvrf_nonce_generation(
     let truncated_hashed_sk_string = hashed_sk_string.slice(32,32);
     let k_string = sha512(&truncated_hashed_sk_string.concat(h_string));
     
-    // TODO is slice correct? Probably yes, it is le, print to test
     let nonce = BigScalar::from_byte_seq_le(k_string);
     let nonceseq = nonce.to_byte_seq_le().slice(0, 32);
     Scalar::from_byte_seq_le(nonceseq)
@@ -219,23 +223,22 @@ fn ecvrf_challenge_generation(
         .concat(&encode(p4))
         .concat(&encode(p5))
         .concat(&challenge_generation_domain_separator_back);
-    // assert_eq!(string, ByteSeq::from_hex("0a"));
     let c_string = sha512(&string);
-    let truncated_c_string = c_string.slice(0, C_LEN);
-    
+    let truncated_c_string= c_string.slice(0, C_LEN).concat(&ByteSeq::new(16));    
+
     Scalar::from_byte_seq_le(truncated_c_string)
 }
 
 // See section 5.4.4
 fn ecvrf_decode_proof(pi: &ByteSeq) -> ProofResult {
-    println!("pi: {}", pi.to_hex());
+    // println!("pi: {}", pi.to_hex());
     let gamma_string = pi.slice(0, PT_LEN);
     let c_string = pi.slice(PT_LEN, C_LEN);
     let s_string = pi.slice(PT_LEN + C_LEN, Q_LEN);
     let gamma = decompress(CompressedEdPoint::from_slice(&gamma_string, 0, 32))
                 .ok_or(Errorec::InvalidProof)?;
 
-    let c = Scalar::from_byte_seq_le(c_string);
+    let c = Scalar::from_byte_seq_le(c_string.concat(&ByteSeq::new(16)));
     let s = Scalar::from_byte_seq_le(s_string);
     // This is definitely wrong see step 8 of decode proof
     // TODO check if s (before mod q) is bigger than q
@@ -322,7 +325,7 @@ mod tests {
     }
 
     #[quickcheck]
-    // #[ignore]
+    #[ignore]
     fn ecvrf(kp: Keyp, alpha: Wrapper) -> bool {
         let alpha = alpha.0.to_byte_seq_be();
         let pi = ecvrf_prove(kp.sk, &alpha).unwrap();
@@ -345,11 +348,12 @@ mod tests {
     }
 
     #[test]
-    fn unit_ecvrf() {
+    fn unit_ecvrf_ell2() {
         let alpha = ByteSeq::from_public_slice(b"");
         let secret = ByteSeq::from_hex("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60");
         let public = ByteSeq::from_hex("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a");
         let pitest = ByteSeq::from_hex("7d9c633ffeee27349264cf5c667579fc583b4bda63ab71d001f89c10003ab46f14adf9a3cd8b8412d9038531e865c341cafa73589b023d14311c331a9ad15ff2fb37831e00f0acaa6d73bc9997b06501");
+        let betatest = ByteSeq::from_hex("9d574bf9b8302ec0fc1e21c3ec5368269527b87b462ce36dab2d14ccf80c53cccf6758f058c5b1c856b116388152bbe509ee3b9ecfe63d93c3b4346c1fbc6c54");
 
         let sk = SerializedScalar::from_slice(&secret, 0, 32);
         let pk = secret_to_public(sk);
@@ -360,6 +364,30 @@ mod tests {
         assert_eq!(pi, pitest);
 
         let beta = ecvrf_proof_to_hash(&pi).unwrap();
+        assert_eq!(beta, betatest);
+
+        let beta_prime = ecvrf_verify(pk, &alpha, &pi, true).unwrap();
+        assert_eq!(beta_prime, beta);
+    }
+    
+    #[test]
+    fn unit_ecvrf_tai() {
+        let alpha = ByteSeq::from_public_slice(b"");
+        let secret = ByteSeq::from_hex("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60");
+        let public = ByteSeq::from_hex("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a");
+        let pitest = ByteSeq::from_hex("8657106690b5526245a92b003bb079ccd1a92130477671f6fc01ad16f26f723f26f8a57ccaed74ee1b190bed1f479d9727d2d0f9b005a6e456a35d4fb0daab1268a1b0db10836d9826a528ca76567805");
+        let betatest = ByteSeq::from_hex("90cf1df3b703cce59e2a35b925d411164068269d7b2d29f3301c03dd757876ff66b71dda49d2de59d03450451af026798e8f81cd2e333de5cdf4f3e140fdd8ae");
+
+        let sk = SerializedScalar::from_slice(&secret, 0, 32);
+        let pk = secret_to_public(sk);
+        let pkstr = secret_to_public_string(sk);
+        assert_eq!(public, pkstr);
+        
+        let pi = ecvrf_prove(sk, &alpha).unwrap();
+        assert_eq!(pi, pitest);
+
+        let beta = ecvrf_proof_to_hash(&pi).unwrap();
+        assert_eq!(beta, betatest);
 
         let beta_prime = ecvrf_verify(pk, &alpha, &pi, true).unwrap();
         assert_eq!(beta_prime, beta);

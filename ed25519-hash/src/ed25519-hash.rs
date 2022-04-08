@@ -1,3 +1,6 @@
+// extern crate creusot_contracts;
+// use creusot_contracts::*;
+
 use hacspec_lib::*;
 use hacspec_ed25519::*;
 use hacspec_sha512::*;
@@ -168,7 +171,6 @@ fn monty_to_edw(p: Point) -> EdPoint {
     let one = Ed25519FieldElement::ONE();
     let zero = Ed25519FieldElement::ZERO();
 
-    println!("t: {}", t);
     let tv1 = s + one;
     let tv2 = tv1 * t;
     let tv2 = tv2.inv();
@@ -439,7 +441,7 @@ mod tests {
 
     #[test]
     #[ignore]
-    fn abc_test() {
+    fn abc_test_straight() {
         let msg = ByteSeq::from_public_slice(b"abc");
         let dst = ByteSeq::from_public_slice(
             b"QUUX-V01-CS02-with-edwards25519_XMD:SHA-512_ELL2_NU_");
@@ -449,10 +451,10 @@ mod tests {
         assert_eq!(u[0usize], Ed25519FieldElement::from_hex( 
             "09cfa30ad79bd59456594a0f5d3a76f6b71c6787b04de98be5cd201a556e253b"));
         
-        let (s, t) = map_to_curve_elligator2(u[0usize]);
-        println!("s nonstraight: {}", s);
-        println!("t nonstraight: {}", t);
-        monty_to_edw((s, t));
+        // let (s, t) = map_to_curve_elligator2(u[0usize]);
+        // println!("s nonstraight: {}", s);
+        // println!("t nonstraight: {}", t);
+        // monty_to_edw((s, t));
 
         println!("\n\n straight stuff:");
         
@@ -474,54 +476,7 @@ mod tests {
         // assert_eq!(t, t_s);
         assert_eq!(qx.to_byte_seq_be().to_hex(), "333e41b61c6dd43af220c1ac34a3663e1cf537f996bab50ab66e33c4bd8e4e19");
         assert_eq!(qy.to_byte_seq_be().to_hex(), "51b6f178eb08c4a782c820e306b82c6e273ab22e258d972cd0c511787b2a3443");
-
-        // qx 23 177 953 318 979 605 650 317 170 340 695 869 570 245 232 951 233 222 690 142 303 031 689 541 996 057
-        // qy 36 960 573 481 849 415 552 737 969 338 192 247 225 895 396 748 735 107 121 224 586 352 183 973 917 763
-
-        // let (x, y, z, _) = ed_clear_cofactor(q);
-        // let z_inv = z.inv();
-        // let x = x * z_inv;
-        // let y = y * z_inv;
-        // let d = Ed25519FieldElement::from_hex(
-        //     "52036cee2b6ffe738cc740797779e89800700a4d4141d8ab75eb4dca135978a3");
-        // let lh = (y * y) - (x * x);
-        // let rh = Ed25519FieldElement::ONE() + (d * x * x * y * y);
-        // assert_eq!(lh, rh)
     }
-
-    #[test]
-    #[ignore]
-    fn empty_test() {
-        let msg = ByteSeq::from_public_slice(b"");
-        let dst = ByteSeq::from_public_slice(
-            b"QUUX-V01-CS02-with-edwards25519_XMD:SHA-512_ELL2_NU_");
-        let u = ed_hash_to_field(&msg, &dst, 1);
-        assert_eq!(u[0usize].to_byte_seq_be().to_hex(), 
-            "7f3e7fb9428103ad7f52db32f9df32505d7b427d894c5093f7a0f0374a30641d");
-    }
-
-    #[test]
-    #[ignore]
-    fn test_g1() {
-        let u = Ed25519FieldElement::from_hex("30f037b9745a57a9a2b8a68da81f397c39d46dee9d047f86c427c53f8b29a55c");
-        let ou = ed_hash_to_field(&ByteSeq::from_public_slice(b""), &ByteSeq::from_public_slice(b""), 1);
-        assert_eq!(u, ou[0]);
-        let q = map_to_curve_elligator2_edwards(u);
-    }
-
-    // #[test]
-    // fn testarmfazh() {
-        // let file = File::open("../h2c-rust-ref/tests/testdata/curve25519_XMD-SHA-512_ELL2_NU_.json").unwrap();
-        // let u: SuiteVector = serde_json::from_reader(BufReader::new(file)).unwrap();
-        // let key = u.ciphersuite.clone();
-        // let mut test = Test {
-        //     name: u.ciphersuite.clone(),
-        //     data: u,
-        //     kind: String::default(),
-        //     is_ignored: false,
-        //     is_bench: false,
-        // };
-    // }
 
 // OPTIMIZED UNIT TESTS ========================================================
     #[test]

@@ -13,6 +13,7 @@ hacspec-lib = { path = "../../hacspec/lib" }
 hacspec-sha512 = { path = "../../hacspec/examples/sha512" }
 hacspec-ed25519 = { path = "../../hacspec/examples/ed25519" }
 hacspec-curve25519 = { path = "../../hacspec/examples/curve25519" }
+creusot-contracts = { path = "../../creusot/creusot-contracts"}
 
 [dev-dependencies]
 quickcheck = "1"
