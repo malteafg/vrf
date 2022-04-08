@@ -180,7 +180,7 @@ fn monty_to_edw(p: Point) -> EdPoint {
     let tv1 = s - one;
     let w = w * tv1;
     let e = tv2 == zero;
-    cmov(w, one, e);
+    let w = cmov(w, one, e);
     
     (v, w, one, v * w)
 }
