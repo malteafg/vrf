@@ -31,16 +31,16 @@ fn suite_string() -> ByteSeq { intbyte(SUITE_INT) }
 pub fn ecvrf_prove(
     sk: SecretKey, alpha: &ByteSeq
 ) -> ByteSeqResult {
-    let base = decompress(BASE).ok_or(Errorec::FailedDecompression)?;
+    let b = decompress(BASE).ok_or(Errorec::FailedDecompression)?;
     
     // STEP 1
     let (x, _) = secret_expand(sk);
     let x = Scalar::from_byte_seq_le(x);
-    let pk = secret_to_public(sk);
-    let y = decompress(secret_to_public(sk)).ok_or(Errorec::InvalidPublicKey)?;
+    let y = point_mul(x, b);
+    let pk = compress(y);
 
     // let pkd = decompress(pk).unwrap();
-    // assert_eq!(normalize(point_mul(x, base)), normalize(pkd));
+    // assert_eq!(normalize(point_mul(x, b)), normalize(pkd));
 
     // STEP 2
     let encode_to_curve_salt = pk.slice(0,32);
@@ -61,7 +61,7 @@ pub fn ecvrf_prove(
     let k = ecvrf_nonce_generation(sk, &h_string);
 
     // STEP 6
-    let u = point_mul(k, base);
+    let u = point_mul(k, b);
     let v = point_mul(k, h);
     let c = ecvrf_challenge_generation(y, h, gamma, u, v);
     //assert_eq!(encode(u), ByteSeq::from_hex("762f5c178b68f0cddcc1157918edf45ec334ac8e8286601a3256c3bbf858edd9"));
@@ -98,7 +98,7 @@ pub fn ecvrf_proof_to_hash(pi: &ByteSeq) -> ByteSeqResult {
 pub fn ecvrf_verify(
     pk: PublicKey, alpha: &ByteSeq, pi: &ByteSeq, validate_key: bool
 ) -> ByteSeqResult {
-    let base = decompress(BASE).ok_or(Errorec::FailedDecompression)?;
+    let b = decompress(BASE).ok_or(Errorec::FailedDecompression)?;
 
     // STEP 1 and 2
     let y = decompress(pk).ok_or(Errorec::InvalidPublicKey)?;
@@ -121,7 +121,7 @@ pub fn ecvrf_verify(
     // assert_eq!(encode(h), ByteSeq::from_hex("b8066ebbb706c72b64390324e4a3276f129569eab100c26b9f05011200c1bad9"));
 
     // STEP 8
-    let u = point_add(point_mul(s, base), point_neg(point_mul(c, y)));
+    let u = point_add(point_mul(s, b), point_neg(point_mul(c, y)));
 
     // STEP 9
     let v = point_add(point_mul(s, h), point_neg(point_mul(c, gamma)));

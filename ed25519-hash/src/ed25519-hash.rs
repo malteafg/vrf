@@ -223,6 +223,30 @@ fn fake_monty_to_edw(p: EdPoint) -> EdPoint {
     (v, w, one, v * w)
 }
 
+// fn fake_monty_to_edw(p: EdPoint) -> EdPoint {
+//     let (s, t, _, _) = normalize(p);
+//     println!("s: {}", s);
+//     println!("t: {}", t);
+
+//     let s = Scalar::from_byte_seq_be(&Ed25519FieldElement::to_byte_seq_be(s));
+//     let t = Scalar::from_byte_seq_be(&Ed25519FieldElement::to_byte_seq_be(t));
+
+//     let tinv = t.pow_self(Scalar::from_hex("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffeb"));
+//     println!("ourtinv: {}", tinv);
+//     println!("tinvnot: {}", t.inv());
+//     let one = Scalar::ONE();
+
+//     let v = s * tinv;
+//     // let v = s * t.inv();
+//     let w = (s - one) * (s + one).inv();
+
+//     let v = Ed25519FieldElement::from_byte_seq_be(&Scalar::to_byte_seq_be(v));
+//     let w = Ed25519FieldElement::from_byte_seq_be(&Scalar::to_byte_seq_be(w));
+//     let one = Ed25519FieldElement::ONE();
+
+//     (v, w, one, v * w)
+// }
+
 // MAP-TO-CURVES ===============================================================
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#section-6.7.1
 // NOTE: returns a curve25519 point, even though represented as EdPoint
