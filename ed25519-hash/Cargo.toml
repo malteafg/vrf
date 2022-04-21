@@ -12,11 +12,9 @@ path = "src/ed25519-hash.rs"
 hacspec-lib = { path = "../../hacspecfork/lib" }
 hacspec-sha512 = { path = "../../hacspecfork/examples/sha512" }
 hacspec-ed25519 = { path = "../../hacspecfork/examples/ed25519" }
-hacspec-curve25519 = { path = "../../hacspecfork/examples/curve25519" }
 # hacspec-lib = { path = "../../hacspec/lib" }
 # hacspec-sha512 = { path = "../../hacspec/examples/sha512" }
 # hacspec-ed25519 = { path = "../../hacspec/examples/ed25519" }
-# hacspec-curve25519 = { path = "../../hacspec/examples/curve25519" }
 
 [dependencies.creusot-contracts]
 git = "https://github.com/xldenis/creusot/"

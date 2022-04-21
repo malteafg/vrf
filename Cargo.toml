@@ -1,5 +1,5 @@
 [workspace]
 members = [
-    "rsa", "rsa-fdh-vrf", "ecvrf", "ed25519-hash"]
+    "rsa", "rsa-fdh-vrf", "ecvrf", "ed25519-hash", "pearlitefun"]
 default-members = [
-    "rsa", "rsa-fdh-vrf", "ecvrf", "ed25519-hash"]
+    "rsa", "rsa-fdh-vrf", "ecvrf", "ed25519-hash", "pearlitefun"]
