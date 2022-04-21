@@ -29,3 +29,6 @@ quickcheck_macros = "1"
 h2c-rust-ref = { git = "https://github.com/armfazh/h2c-rust-ref" }
 redox-ecc = { git = "https://github.com/armfazh/redox-ecc" }
 
+[features]
+contracts = []
+
