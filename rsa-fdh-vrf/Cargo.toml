@@ -9,9 +9,11 @@ edition = "2021"
 path = "src/rsa-fdh-vrf.rs"
 
 [dependencies]
-hacspec-lib = { path = "../../hacspec/lib" }
+hacspec-lib = { path = "../../hacspecfork/lib" }
+hacspec-sha256 = { path = "../../hacspecfork/examples/sha256" }
+# hacspec-lib = { path = "../../hacspec/lib" }
+# hacspec-sha256 = { path = "../../hacspec/examples/sha256" }
 rsa = { path = "../rsa"}
-hacspec-sha256 = { path = "../../hacspec/examples/sha256" }
 
 [dev-dependencies]
 quickcheck = "1"

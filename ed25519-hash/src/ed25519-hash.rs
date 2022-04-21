@@ -1,7 +1,17 @@
-// extern crate creusot_contracts;
-// use creusot_contracts::*;
+#[cfg(not(feature = "hacspec"))]
+extern crate hacspec_lib;
 
-use hacspec_lib::*;
+#[cfg(feature = "hacspec")]
+use hacspec_attributes::*;
+
+#[cfg(not(feature = "hacspec"))]
+extern crate creusot_contracts;
+#[cfg(not(feature = "hacspec"))]
+pub use creusot_contracts::*;
+
+pub use hacspec_lib::*;
+
+// use hacspec_lib::*;
 use hacspec_ed25519::*;
 use hacspec_sha512::*;
 use hacspec_curve25519::*;
@@ -54,6 +64,15 @@ const P_5_8: ArrEd25519FieldElement = ArrEd25519FieldElement(secret_array!(
         0xfffffffffffffffdu64
     ]
 ));
+
+fn trusted_super_oracle(s: &str) -> u32 {
+    return 42u32
+}
+
+#[ensures(result == 42u32)]
+fn the_answer() -> u32 {
+    trusted_super_oracle("the answer to life, the universe and everything")
+}
 
 // HASH-TO-FIELD ===============================================================
 // taken from bls12-381-hash.rs
@@ -189,10 +208,17 @@ fn monty_to_edw(p: Point) -> EdPoint {
 fn fake_monty_to_edw(p: Point) -> EdPoint {
     let (s,t) = p;
     let s = Ed25519FieldElement::from_byte_seq_be(&s.to_byte_seq_be());
+    println!("s: {}", s);
     let t = Ed25519FieldElement::from_byte_seq_be(&t.to_byte_seq_be());
+    println!("t: {}", t);
+
+    let tinv = t.pow_self(Ed25519FieldElement::from_hex("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffeb"));
+    println!("ourtinv: {}", tinv);
+    println!("tinvnot: {}", t.inv());
     let one = Ed25519FieldElement::ONE();
 
-    let v = s * t.inv();
+    let v = s * tinv;
+    // let v = s * t.inv();
     let w = (s - one) * (s + one).inv();
 
     (v, w, one, v * w)
@@ -439,6 +465,50 @@ mod tests {
         p1 != p2
     }
 
+    #[quickcheck]
+    fn straight_on_curve(msg: Wrapper) -> bool {
+        let dst = ByteSeq::from_public_slice(
+            b"ECVRF_edwards25519_XMD:SHA-512_ELL2_NU_");
+        let dst = dst.concat(&ByteSeq::from_hex("04")); 
+        let u = ed_hash_to_field(&msg.0, &dst, 1);
+        let (x, y) = map_to_curve_elligator2_straight(u[0]);
+        let lh = y * y;
+        let rh = (x * x * x) + (X25519FieldElement::from_literal(486662) * x * x) + x;
+        lh == rh
+    }
+    
+    #[quickcheck]
+    fn rational_map_point_on_curve(msg: Wrapper) -> bool {
+        let dst = ByteSeq::from_public_slice(
+            b"ECVRF_edwards25519_XMD:SHA-512_ELL2_NU_");
+        let dst = dst.concat(&ByteSeq::from_hex("04"));
+        let u = ed_hash_to_field(&msg.0, &dst, 1);
+        let st = map_to_curve_elligator2_straight(u[0]);
+
+        let (x, y, z, _) = fake_monty_to_edw(st);
+        let z_inv = z.inv();
+        let x = x * z_inv;
+        let y = y * z_inv;
+        let d = Ed25519FieldElement::from_hex(
+            "52036cee2b6ffe738cc740797779e89800700a4d4141d8ab75eb4dca135978a3");
+        let lh = (y * y) - (x * x);
+        let rh = Ed25519FieldElement::ONE() + (d * x * x * y * y);
+        lh == rh
+    }
+
+    #[quickcheck]
+    fn monty_equals(msg: Wrapper) -> bool {
+        let dst = ByteSeq::from_public_slice(
+            b"ECVRF_edwards25519_XMD:SHA-512_ELL2_NU_");
+        let dst = dst.concat(&ByteSeq::from_hex("04"));
+        let u = ed_hash_to_field(&msg.0, &dst, 1);
+        let st = map_to_curve_elligator2_straight(u[0]);
+
+        let point = monty_to_edw(st);
+        let fake = fake_monty_to_edw(st);
+        point == fake
+    }
+
     #[test]
     #[ignore]
     fn abc_test_straight() {
@@ -471,6 +541,9 @@ mod tests {
         let (qx, qy, _, _) = q;
         println!("qx fake: {}", qx);
         println!("qy fake: {}", qy);
+
+        println!("qx correct: {}", Ed25519FieldElement::from_hex("333e41b61c6dd43af220c1ac34a3663e1cf537f996bab50ab66e33c4bd8e4e19"));
+        println!("qy correct: {}", Ed25519FieldElement::from_hex("51b6f178eb08c4a782c820e306b82c6e273ab22e258d972cd0c511787b2a3443"));
 
         // assert_eq!(s, s_s);
         // assert_eq!(t, t_s);
