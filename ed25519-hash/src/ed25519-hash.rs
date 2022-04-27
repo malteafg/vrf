@@ -64,13 +64,9 @@ const P_5_8: ArrEd25519FieldElement = ArrEd25519FieldElement(secret_array!(
     ]
 ));
 
-fn trusted_super_oracle(s: &str) -> u32 {
-    return 42u32
-}
-
 #[ensures(result == 42u32)]
 fn the_answer() -> u32 {
-    trusted_super_oracle("the answer to life, the universe and everything")
+    return 42u32
 }
 
 // HASH-TO-FIELD ===============================================================
@@ -141,7 +137,7 @@ fn sgn0_m_eq_1(x: Ed25519FieldElement) -> bool {
 }
 
 // adapted from bls12-381-hash.rs
-fn ed_clear_cofactor(x: EdPoint) -> EdPoint {
+pub fn ed_clear_cofactor(x: EdPoint) -> EdPoint {
     point_mul_by_cofactor(x)
 }
 
@@ -183,7 +179,7 @@ fn xor(a: bool, b: bool) -> bool {
 
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#appendix-D.1-13
 // NOTE: takes an EdPoint even though it converts a Curve25519 point
-fn monty_to_edw(p: EdPoint) -> EdPoint {
+pub fn monty_to_edw(p: EdPoint) -> EdPoint {
     let (s, t, _, _) = normalize(p);
     let s = Ed25519FieldElement::from_byte_seq_be(&s.to_byte_seq_be());
     let t = Ed25519FieldElement::from_byte_seq_be(&t.to_byte_seq_be());
@@ -200,6 +196,9 @@ fn monty_to_edw(p: EdPoint) -> EdPoint {
     let w = w * tv1;
     let e = tv2 == zero;
     let w = cmov(w, one, e);
+    let funnum = Ed25519FieldElement::ZERO() - Ed25519FieldElement::from_literal(486664);
+    let sq = sqrt(funnum);
+    let v = v * sq.unwrap();
     
     (v, w, one, v * w)
 }
@@ -215,12 +214,43 @@ fn fake_monty_to_edw(p: EdPoint) -> EdPoint {
     println!("ourtinv: {}", tinv);
     println!("tinvnot: {}", t.inv());
     let one = Ed25519FieldElement::ONE();
+    let funnum = Ed25519FieldElement::ZERO() - Ed25519FieldElement::from_literal(486664);
+    let sq = sqrt(funnum);
 
-    let v = s * tinv;
+    let v = (s * tinv) * sq.unwrap();
     // let v = s * t.inv();
     let w = (s - one) * (s + one).inv();
 
     (v, w, one, v * w)
+}
+
+public_nat_mod!(
+    type_name: SmallEd25519FieldElement,
+    type_of_canvas: FieldCanvas,
+    bit_size_of_field: 8,
+    modulo_value: "5"
+);
+
+pub type SmallEdPoint = (
+    SmallEd25519FieldElement,
+    SmallEd25519FieldElement,
+);
+
+fn small_fake_monty_to_edw(p: SmallEdPoint) -> SmallEdPoint {
+    let (s, t) = p;
+    println!("s: {}", s);
+    println!("t: {}", t);
+
+    // let tinv = t.pow_self(SmallEd25519FieldElement::from_hex("3"));
+    // println!("ourtinv: {}", tinv);
+    // println!("tinvnot: {}", t.inv());
+    let one = SmallEd25519FieldElement::ONE();
+
+    // let v = s * tinv;
+    let v = s * t.inv();
+    let w = (s - one) * (s + one).inv();
+
+    (v, w)
 }
 
 // fn fake_monty_to_edw(p: EdPoint) -> EdPoint {
@@ -251,7 +281,7 @@ fn fake_monty_to_edw(p: EdPoint) -> EdPoint {
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#section-6.7.1
 // NOTE: returns a curve25519 point, even though represented as EdPoint
 // non-straight
-fn map_to_curve_elligator2(u: Ed25519FieldElement) -> EdPoint {
+pub fn map_to_curve_elligator2(u: Ed25519FieldElement) -> EdPoint {
     let j = Ed25519FieldElement::from_literal(J);
     let z = Ed25519FieldElement::from_literal(Z);
     let one = Ed25519FieldElement::ONE();
@@ -263,24 +293,28 @@ fn map_to_curve_elligator2(u: Ed25519FieldElement) -> EdPoint {
     if x1 == zero {
         x1 = zero - j;
     }
+    println!("x1': {}", x1);
     let gx1 = (x1 * x1 * x1) + (j * x1 * x1) + x1;
-    // println!("gx1: {}", gx1);
-    let x2 = zero - (x1 - j);
+    println!("gx1: {}", gx1);
+    let x2 = zero - x1 - j;
+    println!("x2': {}", x2);
     let gx2 = (x2 * x2 * x2) + j * (x2 * x2) + x2;
+    println!("gx2: {}", gx2);
     let mut x = zero;
     let mut y = zero;
     if ed_is_square(gx1) {
+        println!("e2true");
         x = x1;
         // TODO what to do with unwrap?
         y = sqrt(gx1).unwrap();
-        if sgn0_m_eq_1(y) {
+        if !sgn0_m_eq_1(y) {
             y = zero - y;
         }
     } else {
-        // println!("square gx1");
+        println!("e2false");
         x = x2;
         y = sqrt(gx2).unwrap();
-        if !sgn0_m_eq_1(y) {
+        if sgn0_m_eq_1(y) {
             y = zero - y;
         }
     }
@@ -293,7 +327,7 @@ fn map_to_curve_elligator2(u: Ed25519FieldElement) -> EdPoint {
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#name-elligator-2-method-3
 // NOTE: returns a curve25519 point, even though represented as EdPoint
 // straight F.3
-fn map_to_curve_elligator2_straight(u: Ed25519FieldElement) -> EdPoint {
+pub fn map_to_curve_elligator2_straight(u: Ed25519FieldElement) -> EdPoint {
     let j = Ed25519FieldElement::from_literal(J);
     let z = Ed25519FieldElement::from_literal(Z);
     let one = Ed25519FieldElement::ONE();
@@ -310,13 +344,18 @@ fn map_to_curve_elligator2_straight(u: Ed25519FieldElement) -> EdPoint {
     let x1 = x1.inv();
     // println!("x1': {}", x1);
     let x1 = (zero - j) * x1;
+    println!("x1': {}", x1);
     let gx1 = x1 + j;
     let gx1 = gx1 * x1;
     let gx1 = gx1 + one;
     let gx1 = gx1 * x1;
+    println!("gx1: {}", gx1);
     let x2 = zero - x1 - j;
+    println!("x2': {}", x2);
     let gx2 = tv1 * gx1;
+    println!("gx2: {}", gx2);
     let e2 = ed_is_square(gx1);
+    println!("e2: {}", e2);
     let x = cmov(x2, x1, e2);
     let y2 = cmov(gx2, gx1, e2);
     let y = sqrt(y2).unwrap();
@@ -387,7 +426,7 @@ fn map_to_curve_elligator2_curve25519(u: Ed25519FieldElement) -> EdPoint {
 
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#name-edwards25519
 // Optimized G.2
-fn map_to_curve_elligator2_edwards25519(u: Ed25519FieldElement) -> EdPoint {
+pub fn map_to_curve_elligator2_edwards25519(u: Ed25519FieldElement) -> EdPoint {
     let j = Ed25519FieldElement::from_literal(J);
     let zero = Ed25519FieldElement::ZERO();
     let one = Ed25519FieldElement::ONE();
@@ -414,9 +453,8 @@ fn map_to_curve_elligator2_edwards25519(u: Ed25519FieldElement) -> EdPoint {
 
 // MAIN FUNCTIONS ==============================================================
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#section-6.8.2
-fn map_to_curve_elligator2_edwards(u: Ed25519FieldElement) -> EdPoint {
-    let st = map_to_curve_elligator2_straight(u);
-    // monty_to_edw gives the extended homogeneous coordinates
+pub fn map_to_curve_elligator2_edwards(u: Ed25519FieldElement) -> EdPoint {
+    let st = map_to_curve_elligator2(u);
     monty_to_edw(st)
 }
 
@@ -509,7 +547,7 @@ mod tests {
         let u = ed_hash_to_field(&msg.0, &dst, 1);
         let st = map_to_curve_elligator2_straight(u[0]);
 
-        let (x, y, z, _) = fake_monty_to_edw(st);
+        let (x, y, z, _) = monty_to_edw(st);
         let z_inv = z.inv();
         let x = x * z_inv;
         let y = y * z_inv;
@@ -531,6 +569,26 @@ mod tests {
         let point = monty_to_edw(st);
         let fake = fake_monty_to_edw(st);
         point == fake
+    }
+
+    #[test]
+    fn small_fake_map() {
+        let x = SmallEd25519FieldElement::ONE();
+        let y = SmallEd25519FieldElement::TWO();
+        let lh = y * y;
+        let rh = (x * x * x) + (SmallEd25519FieldElement::from_literal(2) * x * x) + x;
+        assert_eq!(lh, rh);
+
+        // let (u, v) = small_fake_monty_to_edw((x,y));
+        // let lh = (v * v) - (u * u);
+        // let rh = Ed25519FieldElement::ONE() + (d * u * u * v * v);
+        // assert_eq!(lh, rh);
+
+
+        let x = SmallEd25519FieldElement::TWO();
+        let lh = y * y;
+        let rh = (x * x * x) + (SmallEd25519FieldElement::from_literal(2) * x * x) + x;
+        assert_ne!(lh, rh)
     }
 
     #[test]
@@ -557,23 +615,28 @@ mod tests {
         println!("s straight: {}", s_s);
         println!("t straight: {}", t_s);
 
-        let q = monty_to_edw((s_s, t_s, one, s_s * t_s));
-        let (qx, qy, _, _) = q;
-        println!("qx: {}", qx);
-        println!("qy: {}", qy);
+        let (s, t, _, _) = map_to_curve_elligator2(u[0usize]);
+        println!("s: {}", s);
+        println!("t: {}", t);
 
-        let q = fake_monty_to_edw((s_s, t_s, one, s_s * t_s));
-        let (qx, qy, _, _) = q;
-        println!("qx fake: {}", qx);
-        println!("qy fake: {}", qy);
 
-        println!("qx correct: {}", Ed25519FieldElement::from_hex("333e41b61c6dd43af220c1ac34a3663e1cf537f996bab50ab66e33c4bd8e4e19"));
-        println!("qy correct: {}", Ed25519FieldElement::from_hex("51b6f178eb08c4a782c820e306b82c6e273ab22e258d972cd0c511787b2a3443"));
+        // let q = monty_to_edw((s_s, t_s, one, s_s * t_s));
+        // let (qx, qy, _, _) = q;
+        // println!("qx: {}", qx);
+        // println!("qy: {}", qy);
 
-        // assert_eq!(s, s_s);
-        // assert_eq!(t, t_s);
-        assert_eq!(qx.to_byte_seq_be().to_hex(), "333e41b61c6dd43af220c1ac34a3663e1cf537f996bab50ab66e33c4bd8e4e19");
-        assert_eq!(qy.to_byte_seq_be().to_hex(), "51b6f178eb08c4a782c820e306b82c6e273ab22e258d972cd0c511787b2a3443");
+        // let q = fake_monty_to_edw((s_s, t_s, one, s_s * t_s));
+        // let (qx, qy, _, _) = q;
+        // println!("qx fake: {}", qx);
+        // println!("qy fake: {}", qy);
+
+        // println!("qx correct: {}", Ed25519FieldElement::from_hex("333e41b61c6dd43af220c1ac34a3663e1cf537f996bab50ab66e33c4bd8e4e19"));
+        // println!("qy correct: {}", Ed25519FieldElement::from_hex("51b6f178eb08c4a782c820e306b82c6e273ab22e258d972cd0c511787b2a3443"));
+
+        assert_eq!(s, s_s);
+        assert_eq!(t, t_s);
+        // assert_eq!(qx.to_byte_seq_be().to_hex(), "333e41b61c6dd43af220c1ac34a3663e1cf537f996bab50ab66e33c4bd8e4e19");
+        // assert_eq!(qy.to_byte_seq_be().to_hex(), "51b6f178eb08c4a782c820e306b82c6e273ab22e258d972cd0c511787b2a3443");
     }
 
 // OPTIMIZED UNIT TESTS ========================================================

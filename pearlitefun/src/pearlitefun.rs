@@ -11,12 +11,24 @@ pub use creusot_contracts::*;
 
 pub use hacspec_lib::*;
 
-#[trusted]
-fn trusted_super_oracle() -> u32 {
-    return 42u32
-}
+public_nat_mod!(
+    type_name: Ed25519FieldElement,
+    type_of_canvas: FieldCanvas,
+    bit_size_of_field: 256,
+    modulo_value: "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffed"
+);
 
 #[ensures(result == 42u32)]
 fn the_answer() -> u32 {
-    trusted_super_oracle()
+    return 42u32
+}
+
+fn cmov(
+    a: Ed25519FieldElement, b: Ed25519FieldElement, c: bool
+) -> Ed25519FieldElement {
+    if c {
+        b
+    } else {
+        a
+    }
 }

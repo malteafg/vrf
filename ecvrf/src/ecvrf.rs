@@ -21,7 +21,7 @@ pub type BoolResult = Result<bool, Errorec>;
 const C_LEN: usize = 16usize;
 const PT_LEN: usize = 32usize;
 const Q_LEN: usize = 32usize;
-const SUITE_INT: usize = 3usize;
+const SUITE_INT: usize = 4usize;
 
 fn suite_string() -> ByteSeq { intbyte(SUITE_INT) }
     
@@ -44,10 +44,10 @@ pub fn ecvrf_prove(
 
     // STEP 2
     let encode_to_curve_salt = pk.slice(0,32);
-    //let h = ecvrf_encode_to_curve_h2c_suite(&encode_to_curve_salt, alpha);
+    let h = ecvrf_encode_to_curve_h2c_suite(&encode_to_curve_salt, alpha);
     // assert_eq!(encode(h), ByteSeq::from_hex("b8066ebbb706c72b64390324e4a3276f129569eab100c26b9f05011200c1bad9"));
 
-    let h = ecvrf_encode_to_curve_try_and_increment(&encode_to_curve_salt, alpha);
+    // let h = ecvrf_encode_to_curve_try_and_increment(&encode_to_curve_salt, alpha);
     // assert_eq!(encode(h), ByteSeq::from_hex("91bbed02a99461df1ad4c6564a5f5d829d0b90cfc7903e7a5797bd658abf3318"));
 
     // STEP 3
@@ -116,8 +116,8 @@ pub fn ecvrf_verify(
 
     // STEP 7
     let encode_to_curve_salt = pk.slice(0,32);
-    // let h = ecvrf_encode_to_curve_h2c_suite(&encode_to_curve_salt, alpha);
-    let h = ecvrf_encode_to_curve_try_and_increment(&encode_to_curve_salt, alpha);
+    let h = ecvrf_encode_to_curve_h2c_suite(&encode_to_curve_salt, alpha);
+    // let h = ecvrf_encode_to_curve_try_and_increment(&encode_to_curve_salt, alpha);
     // assert_eq!(encode(h), ByteSeq::from_hex("b8066ebbb706c72b64390324e4a3276f129569eab100c26b9f05011200c1bad9"));
 
     // STEP 8
