@@ -196,6 +196,21 @@ mod tests {
         }
     }
 
+    #[quickcheck]
+    #[ignore]
+    fn negalpharsafhdvrf(
+        kp: Keyp, alpha: Wrapper, fake_alpha: Wrapper
+    ) -> bool {
+        let alpha = i2osp(alpha.0, BYTE_SIZE).unwrap();
+        let fake_alpha = i2osp(fake_alpha.0, BYTE_SIZE).unwrap();
+        let pi = prove((kp.n, kp.d), &alpha).unwrap();
+        match verify((kp.n, kp.e), &fake_alpha, &pi) {
+            Ok(_beta_prime) => panic!(),
+            Err(e) => matches!(e, Error::InvalidProof 
+                                | Error::MessageTooLargeVerify),
+        }
+    }
+
     #[test]
     fn unitrsafhdvrf() {
         let (pk, sk) = rsa_key_gen();

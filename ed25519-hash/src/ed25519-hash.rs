@@ -224,59 +224,6 @@ fn fake_monty_to_edw(p: EdPoint) -> EdPoint {
     (v, w, one, v * w)
 }
 
-public_nat_mod!(
-    type_name: SmallEd25519FieldElement,
-    type_of_canvas: FieldCanvas,
-    bit_size_of_field: 8,
-    modulo_value: "5"
-);
-
-pub type SmallEdPoint = (
-    SmallEd25519FieldElement,
-    SmallEd25519FieldElement,
-);
-
-fn small_fake_monty_to_edw(p: SmallEdPoint) -> SmallEdPoint {
-    let (s, t) = p;
-    println!("s: {}", s);
-    println!("t: {}", t);
-
-    // let tinv = t.pow_self(SmallEd25519FieldElement::from_hex("3"));
-    // println!("ourtinv: {}", tinv);
-    // println!("tinvnot: {}", t.inv());
-    let one = SmallEd25519FieldElement::ONE();
-
-    // let v = s * tinv;
-    let v = s * t.inv();
-    let w = (s - one) * (s + one).inv();
-
-    (v, w)
-}
-
-// fn fake_monty_to_edw(p: EdPoint) -> EdPoint {
-//     let (s, t, _, _) = normalize(p);
-//     println!("s: {}", s);
-//     println!("t: {}", t);
-
-//     let s = Scalar::from_byte_seq_be(&Ed25519FieldElement::to_byte_seq_be(s));
-//     let t = Scalar::from_byte_seq_be(&Ed25519FieldElement::to_byte_seq_be(t));
-
-//     let tinv = t.pow_self(Scalar::from_hex("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffeb"));
-//     println!("ourtinv: {}", tinv);
-//     println!("tinvnot: {}", t.inv());
-//     let one = Scalar::ONE();
-
-//     let v = s * tinv;
-//     // let v = s * t.inv();
-//     let w = (s - one) * (s + one).inv();
-
-//     let v = Ed25519FieldElement::from_byte_seq_be(&Scalar::to_byte_seq_be(v));
-//     let w = Ed25519FieldElement::from_byte_seq_be(&Scalar::to_byte_seq_be(w));
-//     let one = Ed25519FieldElement::ONE();
-
-//     (v, w, one, v * w)
-// }
-
 // MAP-TO-CURVES ===============================================================
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#section-6.7.1
 // NOTE: returns a curve25519 point, even though represented as EdPoint
@@ -569,26 +516,6 @@ mod tests {
         let point = monty_to_edw(st);
         let fake = fake_monty_to_edw(st);
         point == fake
-    }
-
-    #[test]
-    fn small_fake_map() {
-        let x = SmallEd25519FieldElement::ONE();
-        let y = SmallEd25519FieldElement::TWO();
-        let lh = y * y;
-        let rh = (x * x * x) + (SmallEd25519FieldElement::from_literal(2) * x * x) + x;
-        assert_eq!(lh, rh);
-
-        // let (u, v) = small_fake_monty_to_edw((x,y));
-        // let lh = (v * v) - (u * u);
-        // let rh = Ed25519FieldElement::ONE() + (d * u * u * v * v);
-        // assert_eq!(lh, rh);
-
-
-        let x = SmallEd25519FieldElement::TWO();
-        let lh = y * y;
-        let rh = (x * x * x) + (SmallEd25519FieldElement::from_literal(2) * x * x) + x;
-        assert_ne!(lh, rh)
     }
 
     #[test]

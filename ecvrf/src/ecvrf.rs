@@ -347,6 +347,18 @@ mod tests {
         }
     }
 
+    #[quickcheck]
+    #[ignore]
+    fn neg_alpha_ecvrf(kp: Keyp, alpha: Wrapper, fake_alpha: Wrapper) -> bool {
+        let alpha = alpha.0.to_byte_seq_be();
+        let fake_alpha = fake_alpha.0.to_byte_seq_be();
+        let pi = ecvrf_prove(kp.sk, &alpha).unwrap();
+        match ecvrf_verify(kp.pk, &fake_alpha, &pi, true) {
+            Ok(_beta_prime) => panic!(),
+            Err(e) => matches!(e, Errorec::FailedVerify),
+        }
+    }
+
     #[test]
     fn unit_ecvrf_ell2() {
         let alpha = ByteSeq::from_public_slice(b"");
