@@ -30,7 +30,7 @@ fn vrf_mgf1(n: RSAInt, alpha: &ByteSeq) -> ByteSeqResult {
     ByteSeqResult::Ok(mgf)
 }
 
-// Cipher suite = RSA-FDH-VRF-SHA256, TODO: extend to others
+// Cipher suite = RSA-FDH-VRF-SHA256
 // MGF_salt currently part of cipher suite, could be optional input
 // Input: Secret Key, alpha string in ByteSeq
 // Output: pi_string proof that beta was calculated correctly

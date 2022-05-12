@@ -181,8 +181,8 @@ fn xor(a: bool, b: bool) -> bool {
 // NOTE: takes an EdPoint even though it converts a Curve25519 point
 pub fn monty_to_edw(p: EdPoint) -> EdPoint {
     let (s, t, _, _) = normalize(p);
-    let s = Ed25519FieldElement::from_byte_seq_be(&s.to_byte_seq_be());
-    let t = Ed25519FieldElement::from_byte_seq_be(&t.to_byte_seq_be());
+    // let s = Ed25519FieldElement::from_byte_seq_be(&s.to_byte_seq_be());
+    // let t = Ed25519FieldElement::from_byte_seq_be(&t.to_byte_seq_be());
     let one = Ed25519FieldElement::ONE();
     let zero = Ed25519FieldElement::ZERO();
 
@@ -207,18 +207,12 @@ pub fn monty_to_edw(p: EdPoint) -> EdPoint {
 // NOTE: takes an EdPoint even though it converts a Curve25519 point
 fn fake_monty_to_edw(p: EdPoint) -> EdPoint {
     let (s, t, _, _) = normalize(p);
-    println!("s: {}", s);
-    println!("t: {}", t);
-
     let tinv = t.pow_self(Ed25519FieldElement::from_hex("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffeb"));
-    println!("ourtinv: {}", tinv);
-    println!("tinvnot: {}", t.inv());
     let one = Ed25519FieldElement::ONE();
     let funnum = Ed25519FieldElement::ZERO() - Ed25519FieldElement::from_literal(486664);
     let sq = sqrt(funnum);
 
     let v = (s * tinv) * sq.unwrap();
-    // let v = s * t.inv();
     let w = (s - one) * (s + one).inv();
 
     (v, w, one, v * w)
