@@ -1,17 +1,4 @@
-#[cfg(not(feature = "hacspec"))]
-extern crate hacspec_lib;
-
-#[cfg(feature = "hacspec")]
-use hacspec_attributes::*;
-
-#[cfg(not(feature = "hacspec"))]
-extern crate creusot_contracts;
-#[cfg(not(feature = "hacspec"))]
-pub use creusot_contracts::*;
-
-pub use hacspec_lib::*;
-
-// use hacspec_lib::*;
+use hacspec_lib::*;
 use hacspec_ed25519::*;
 use hacspec_sha512::*;
 
@@ -63,11 +50,6 @@ const P_5_8: ArrEd25519FieldElement = ArrEd25519FieldElement(secret_array!(
         0xfffffffffffffffdu64
     ]
 ));
-
-#[ensures(result == 42u32)]
-fn the_answer() -> u32 {
-    return 42u32
-}
 
 // HASH-TO-FIELD ===============================================================
 // taken from bls12-381-hash.rs
@@ -167,22 +149,10 @@ fn xor(a: bool, b: bool) -> bool {
     }
 }
 
-// fn inv0(x: Ed25519FieldElement) -> Ed25519FieldElement {
-//     let one = Ed25519FieldElement::ONE();
-//     let zero = Ed25519FieldElement::ZERO();
-//     if (x == zero) {
-//         zero
-//     } else {
-//         x.pow(zero)
-//     }
-// }
-
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#appendix-D.1-13
 // NOTE: takes an EdPoint even though it converts a Curve25519 point
 pub fn monty_to_edw(p: EdPoint) -> EdPoint {
     let (s, t, _, _) = normalize(p);
-    // let s = Ed25519FieldElement::from_byte_seq_be(&s.to_byte_seq_be());
-    // let t = Ed25519FieldElement::from_byte_seq_be(&t.to_byte_seq_be());
     let one = Ed25519FieldElement::ONE();
     let zero = Ed25519FieldElement::ZERO();
 
@@ -196,6 +166,7 @@ pub fn monty_to_edw(p: EdPoint) -> EdPoint {
     let w = w * tv1;
     let e = tv2 == zero;
     let w = cmov(w, one, e);
+    // TODO no funnum
     let funnum = Ed25519FieldElement::ZERO() - Ed25519FieldElement::from_literal(486664);
     let sq = sqrt(funnum);
     let v = v * sq.unwrap();
@@ -229,30 +200,21 @@ pub fn map_to_curve_elligator2(u: Ed25519FieldElement) -> EdPoint {
     let zero = Ed25519FieldElement::ZERO();
 
     let mut x1 = (zero - j) * (one + (z * u * u)).inv();
-    // println!("u: {}", u);
-    // println!("uu: {}", (one + (z * u * u)));
     if x1 == zero {
         x1 = zero - j;
     }
-    println!("x1': {}", x1);
     let gx1 = (x1 * x1 * x1) + (j * x1 * x1) + x1;
-    println!("gx1: {}", gx1);
     let x2 = zero - x1 - j;
-    println!("x2': {}", x2);
     let gx2 = (x2 * x2 * x2) + j * (x2 * x2) + x2;
-    println!("gx2: {}", gx2);
     let mut x = zero;
     let mut y = zero;
     if ed_is_square(gx1) {
-        println!("e2true");
         x = x1;
-        // TODO what to do with unwrap?
         y = sqrt(gx1).unwrap();
         if !sgn0_m_eq_1(y) {
             y = zero - y;
         }
     } else {
-        println!("e2false");
         x = x2;
         y = sqrt(gx2).unwrap();
         if sgn0_m_eq_1(y) {
@@ -274,29 +236,20 @@ pub fn map_to_curve_elligator2_straight(u: Ed25519FieldElement) -> EdPoint {
     let one = Ed25519FieldElement::ONE();
     let zero = Ed25519FieldElement::ZERO();
 
-    // println!("u: {}", u);
     let tv1 = u * u;
     let tv1 = z * tv1;
     let e1 = tv1 == zero - one;
-    // println!("e1: {}", e1);
     let tv1 = cmov(tv1, zero, e1);
     let x1 = tv1 + one;
-    // println!("x1: {}", x1);
     let x1 = x1.inv();
-    // println!("x1': {}", x1);
     let x1 = (zero - j) * x1;
-    println!("x1': {}", x1);
     let gx1 = x1 + j;
     let gx1 = gx1 * x1;
     let gx1 = gx1 + one;
     let gx1 = gx1 * x1;
-    println!("gx1: {}", gx1);
     let x2 = zero - x1 - j;
-    println!("x2': {}", x2);
     let gx2 = tv1 * gx1;
-    println!("gx2: {}", gx2);
     let e2 = ed_is_square(gx1);
-    println!("e2: {}", e2);
     let x = cmov(x2, x1, e2);
     let y2 = cmov(gx2, gx1, e2);
     let y = sqrt(y2).unwrap();
