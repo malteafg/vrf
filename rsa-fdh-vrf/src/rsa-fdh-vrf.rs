@@ -203,8 +203,8 @@ mod tests {
     ) -> bool {
         let alpha = i2osp(alpha.0, BYTE_SIZE).unwrap();
         let fake_alpha = i2osp(fake_alpha.0, BYTE_SIZE).unwrap();
-        let pi = prove((kp.n, kp.d), &alpha).unwrap();
-        match verify((kp.n, kp.e), &fake_alpha, &pi) {
+        let pi = prove((kp.n, kp.d), &fake_alpha).unwrap();
+        match verify((kp.n, kp.e), &alpha, &pi) {
             Ok(_beta_prime) => panic!(),
             Err(e) => matches!(e, Error::InvalidProof 
                                 | Error::MessageTooLargeVerify),
