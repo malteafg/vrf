@@ -9,6 +9,7 @@ fn the_answer() -> u32 {
 }
 
 #[ensures(if c {result == b} else {result == a})]
+#[ensures(a == a)]
 fn cmov(
     a: u32, b: u32, c: bool
 ) -> u32 {

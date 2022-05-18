@@ -9,6 +9,11 @@ extern crate creusot_contracts;
 #[cfg(not(feature = "hacspec"))]
 pub use creusot_contracts::*;
 pub use creusot_contracts::ensures;
+pub use creusot_contracts::requires;
+pub use creusot_contracts::logic;
+pub use creusot_contracts::predicate;
+pub use creusot_contracts::pearlite;
+pub use creusot_contracts::trusted;
 
 pub use hacspec_lib::*;
 pub use hacspec_lib::Seq;
@@ -44,17 +49,12 @@ public_nat_mod!(
     modulo_value: "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffed"
 );
 
-// pub type EdPoint = (
-//     Ed25519FieldElement,
-//     Ed25519FieldElement,
-//     Ed25519FieldElement,
-//     Ed25519FieldElement,
-// );
-
-// #[ensures(result == 42u32)]
-// fn the_answer() -> u32 {
-//     return 42u32
-// }
+pub type EdPoint = (
+    Ed25519FieldElement,
+    Ed25519FieldElement,
+    Ed25519FieldElement,
+    Ed25519FieldElement,
+);
 
 // #[ensures(if c {result === b} else {result === a})]
 // fn cmov(
@@ -67,9 +67,9 @@ public_nat_mod!(
 //     }
 // }
 
-// pub fn sqrt(a: Ed25519FieldElement) -> Option<Ed25519FieldElement> {
-//     #[rustfmt::skip]
-//     let CONSTANT_P3_8: SerializedScalar = SerializedScalar(secret_array!(
+// not possible in creusot
+// pub fn P3_8() -> SerializedScalar {
+//     SerializedScalar(secret_array!(
 //         U8, 
 //         [
 //             0xfeu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 
@@ -77,21 +77,12 @@ public_nat_mod!(
 //             0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 
 //             0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0x0fu8 
 //         ]
-//     ));
+//     ))
+// }
 
-//     #[rustfmt::skip]
-//     let CONSTANT_P1_4: SerializedScalar = SerializedScalar(secret_array!(
-//         U8, 
-//         [
-//             0xfbu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 
-//             0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 
-//             0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 
-//             0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0xffu8, 0x1fu8 
-//         ]
-//     ));
-
-//     let p3_8 = Ed25519FieldElement::from_byte_seq_le(CONSTANT_P3_8);
-//     let p1_4 = Ed25519FieldElement::from_byte_seq_le(CONSTANT_P1_4);
+// pub fn sqrt(a: Ed25519FieldElement) -> Option<Ed25519FieldElement> {
+//     let p3_8 = Ed25519FieldElement::from_literal(1234);
+//     let p1_4 = Ed25519FieldElement::from_literal(780);
 
 //     let x_c = a.pow_self(p3_8);
 //     let mut result: Option<Ed25519FieldElement> = Option::<Ed25519FieldElement>::None;
