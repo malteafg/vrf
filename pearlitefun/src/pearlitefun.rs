@@ -132,7 +132,27 @@ fn cmov(
 //     a + b == b
 // }
 
+// #[predicate]
+// fn is_curve25519(s: Int, t: Int) -> bool {
+// fn is_curve25519(x: Ed25519FieldElement, y: Ed25519FieldElement) -> bool {
+//     // y * y == (x * x * x) + (Ed25519FieldElement::from_literal(486662) * x * x) + x
+//     let lh = y * y;
+//     let rh = (x * x * x) + (Ed25519FieldElement::from_literal(486662) * x * x) + x;
+//     lh == rh
+// }
+
+// #[predicate]
+// fn is_edwards25519(s: Int, t: Int) -> bool {
+// fn is_edwards25519(x: Ed25519FieldElement, y: Ed25519FieldElement) -> bool {
+//     // (y * y) - (x * x) == Ed25519FieldElement::ONE() + (d * x * x * y * y)
+//     let lh = (y * y) - (x * x);
+//     let rh = Ed25519FieldElement::ONE() + (d * x * x * y * y);
+//     lh == rh
+// }
+
 // #[ensures(sum_one_hactrust(s, t))]
+// #[requires(is_curve25519(s, t))]
+// #[ensures(is_edwards25519(result.0, result.1))]
 pub fn monty_to_edw(
     s: Ed25519FieldElement, t: Ed25519FieldElement
 ) -> (Ed25519FieldElement, Ed25519FieldElement) {
