@@ -21,6 +21,7 @@ pub use hacspec_lib::Seq;
 // bytes!(SerializedScalar, 32);
 
 // #[rustfmt::skip]
+// (p+3)/8
 // const CONSTANT_P3_8: SerializedScalar = SerializedScalar(secret_array!(
 //     U8, 
 //     [
@@ -32,6 +33,7 @@ pub use hacspec_lib::Seq;
 // ));
 
 // #[rustfmt::skip]
+// (p-1)/4
 // const CONSTANT_P1_4: SerializedScalar = SerializedScalar(secret_array!(
 //     U8, 
 //     [
@@ -49,24 +51,6 @@ public_nat_mod!(
     modulo_value: "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffed"
 );
 
-pub type EdPoint = (
-    Ed25519FieldElement,
-    Ed25519FieldElement,
-    Ed25519FieldElement,
-    Ed25519FieldElement,
-);
-
-// #[ensures(if c {result === b} else {result === a})]
-// fn cmov(
-//     a: Ed25519FieldElement, b: Ed25519FieldElement, c: bool
-// ) -> Ed25519FieldElement {
-//     if c {
-//         b
-//     } else {
-//         a
-//     }
-// }
-
 // not possible in creusot
 // pub fn P3_8() -> SerializedScalar {
 //     SerializedScalar(secret_array!(
@@ -80,64 +64,94 @@ pub type EdPoint = (
 //     ))
 // }
 
-// pub fn sqrt(a: Ed25519FieldElement) -> Option<Ed25519FieldElement> {
-//     let p3_8 = Ed25519FieldElement::from_literal(1234);
-//     let p1_4 = Ed25519FieldElement::from_literal(780);
-
-//     let x_c = a.pow_self(p3_8);
-//     let mut result: Option<Ed25519FieldElement> = Option::<Ed25519FieldElement>::None;
-//     if x_c * x_c == a {
-//         result = Some(x_c);
-//     };
-//     if x_c * x_c == Ed25519FieldElement::ZERO() - a {
-//         let x = Ed25519FieldElement::TWO().pow_self(p1_4) * x_c;
-//         result = Some(x);
-//     }
-//     result
+// #[trusted]
+// fn mul(y:Int, x:Int) -> Int {
+//     y * x
 // }
 
-// pub fn normalize(p: EdPoint) -> EdPoint {
-//     let px = p.0 * p.2.inv();
-//     let py = p.1 * p.2.inv();
-//     let pz = Ed25519FieldElement::ONE();
-//     let pt = px * py;
-//     (px, py, pz, pt)
+// #[logic]
+// #[trusted]
+// fn sqr(x: creusot_contracts::Int) -> creusot_contracts::Int { mul(x, x) }
+
+pub fn sqrt(a: Ed25519FieldElement) -> Option<Ed25519FieldElement> {
+    let p3_8 = Ed25519FieldElement::from_hex("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe");
+    let p1_4 = Ed25519FieldElement::from_hex("0x1ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffb");
+
+    let x_c = a.pow_self(p3_8);
+    let mut result: Option<Ed25519FieldElement> = Option::<Ed25519FieldElement>::None;
+    if (x_c * x_c).is_eq(&a) {
+        result = Some(x_c);
+    };
+    if (x_c * x_c).is_eq(&(Ed25519FieldElement::ZERO() - a)) {
+        let x = Ed25519FieldElement::TWO().pow_self(p1_4) * x_c;
+        result = Some(x);
+    }
+    result
+}
+
+#[predicate]
+fn sum_one(a: u32, b: u32) -> bool {
+    a + b == b
+}
+
+#[ensures(sum_one(a,b))]
+fn cmov_u32(
+    a: u32, b: u32, c: bool
+) -> u32 {
+    if c {
+        b
+    } else {
+        a
+    }
+}
+
+// #[predicate]
+// fn sum_one_hac(a: Ed25519FieldElement, b: Ed25519FieldElement) -> bool {
+//     a + b > b
 // }
 
-// // https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#appendix-D.1-13
-// pub fn monty_to_edw(p: EdPoint) -> EdPoint {
-//     let (s, t, _, _) = normalize(p);
-//     let one = Ed25519FieldElement::ONE();
-//     let zero = Ed25519FieldElement::ZERO();
+// #[predicate]
+// fn sum_one_hac(a: Ed25519FieldElement, b: Ed25519FieldElement) -> bool {
+//     a + b == b
+// }
 
-//     let tv1 = s + one;
-//     let tv2 = tv1 * t;
-//     let tv2 = tv2.inv();
-//     let v = tv2 * tv1;
-//     let v = v * s;
-//     let w = tv2 * t;
-//     let tv1 = s - one;
-//     let w = w * tv1;
-//     let e = tv2 == zero;
-//     let w = cmov(w, one, e);
-//     let funnum = zero - Ed25519FieldElement::from_literal(486664);
-//     let sq = sqrt(funnum);
-//     let v = v * sq.unwrap();
+// #[ensures(sum_one_hac(a,b))]
+#[ensures(if c {result == b} else {result == a})]
+fn cmov(
+    a: Ed25519FieldElement, b: Ed25519FieldElement, c: bool
+) -> Ed25519FieldElement {
+    if c {
+        b
+    } else {
+        a
+    }
+}
+
+// #[trusted]
+// fn sum_one_hactrust(a: Ed25519FieldElement, b: Ed25519FieldElement) -> bool {
+//     a + b == b
+// }
+
+// #[ensures(sum_one_hactrust(s, t))]
+pub fn monty_to_edw(
+    s: Ed25519FieldElement, t: Ed25519FieldElement
+) -> (Ed25519FieldElement, Ed25519FieldElement) {
+    let one = Ed25519FieldElement::ONE();
+    let zero = Ed25519FieldElement::ZERO();
+
+    let tv1 = s + one;
+    let tv2 = tv1 * t;
+    let tv2 = tv2.inv();
+    let v = tv2 * tv1;
+    let v = v * s;
+    let w = tv2 * t;
+    let tv1 = s - one;
+    let w = w * tv1;
+    let e = tv2.is_eq(&zero);
+    let w = cmov(w, one, e);
+    let funnum = zero - Ed25519FieldElement::from_literal(486664);
+    let sq = sqrt(funnum);
+    let v = v * sq.unwrap();
     
-//     (v, w, one, v * w)
-// }
-
-// // does not convert the identity point
-// // NOTE: takes an EdPoint even though it converts a Curve25519 point
-// fn fake_monty_to_edw(p: EdPoint) -> EdPoint {
-//     let (s, t, _, _) = normalize(p);
-//     let tinv = t.pow_self(Ed25519FieldElement::from_hex("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffeb"));
-//     let one = Ed25519FieldElement::ONE();
-//     let funnum = Ed25519FieldElement::ZERO() - Ed25519FieldElement::from_literal(486664);
-//     let sq = sqrt(funnum);
-
-//     let v = (s * tinv) * sq.unwrap();
-//     let w = (s - one) * (s + one).inv();
-
-//     (v, w, one, v * w)
-// }
+    (v, w)
+}

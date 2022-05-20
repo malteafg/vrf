@@ -8,8 +8,14 @@ fn the_answer() -> u32 {
     return 42u32
 }
 
+#[predicate]
+fn sum_one(a: u32, b: u32) -> bool {
+    a + b > b
+}
+
 #[ensures(if c {result == b} else {result == a})]
 #[ensures(a == a)]
+#[ensures(sum_one(a,b))]
 fn cmov(
     a: u32, b: u32, c: bool
 ) -> u32 {
