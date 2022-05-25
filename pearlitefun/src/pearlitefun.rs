@@ -89,21 +89,21 @@ pub fn sqrt(a: Ed25519FieldElement) -> Option<Ed25519FieldElement> {
     result
 }
 
-#[predicate]
-fn sum_one(a: u32, b: u32) -> bool {
-    a + b == b
-}
+// #[predicate]
+// fn sum_one(a: u32, b: u32) -> bool {
+//     a + b == b
+// }
 
-#[ensures(sum_one(a,b))]
-fn cmov_u32(
-    a: u32, b: u32, c: bool
-) -> u32 {
-    if c {
-        b
-    } else {
-        a
-    }
-}
+// #[ensures(sum_one(a,b))]
+// fn cmov_u32(
+//     a: u32, b: u32, c: bool
+// ) -> u32 {
+//     if c {
+//         b
+//     } else {
+//         a
+//     }
+// }
 
 // #[predicate]
 // fn sum_one_hac(a: Ed25519FieldElement, b: Ed25519FieldElement) -> bool {
@@ -127,22 +127,99 @@ fn cmov(
     }
 }
 
+// #[requires(a <= 10)]
+// #[ensures(result == a + 5)]
+// fn test(a: u32) -> u32 {
+//     if a > 10 {
+//         0
+//     } else {
+//         a + 5
+//     }
+// }
+
+// #[ensures(result == a + 1u32)]
+// fn plusone(a: u32) -> u32 {
+//     a + 1u32
+// }
+
 // #[trusted]
 // fn sum_one_hactrust(a: Ed25519FieldElement, b: Ed25519FieldElement) -> bool {
 //     a + b == b
 // }
 
-// #[predicate]
 // fn is_curve25519(s: Int, t: Int) -> bool {
-// fn is_curve25519(x: Ed25519FieldElement, y: Ed25519FieldElement) -> bool {
+// #[trusted]
+// #[predicate]
+// pub fn is_curve25519(x: Ed25519FieldElement, y: Ed25519FieldElement) -> bool {
 //     // y * y == (x * x * x) + (Ed25519FieldElement::from_literal(486662) * x * x) + x
 //     let lh = y * y;
-//     let rh = (x * x * x) + (Ed25519FieldElement::from_literal(486662) * x * x) + x;
+//     // TODO fix missing numbers
+//     let rh = (x * x * x) + (x * x) + x;
 //     lh == rh
 // }
 
 // #[predicate]
+// pub fn mult(x: Ed25519FieldElement) -> bool {
+//     let lh = x * x;
+//     let rh = x * x;
+//     lh.is_eq(&rh)
+// }
+
+// #[predicate]
+// pub fn mult(x: u32) -> bool {
+//     let lh = x * x;
+//     let rh = x * x;
+//     lh == rh
+// }
+
+// #[ensures(mult(x) == true)]
+// pub fn mult_test(x: u32) -> u32 {
+//     x
+// }
+
+#[ensures(result == true)]
+fn add_commut(x: Ed25519FieldElement, y: Ed25519FieldElement) -> bool {
+    (x + y).is_eq(&(y + x))
+}
+
+#[ensures(result == true)]
+fn mul_commut(x: Ed25519FieldElement, y: Ed25519FieldElement) -> bool {
+    (x * y).is_eq(&(y * x))
+}
+
+#[ensures(result == true)]
+fn add_assoc(
+    x: Ed25519FieldElement, y: Ed25519FieldElement, z: Ed25519FieldElement
+) -> bool {
+    ((x + y) + z).is_eq(&(x + (y + z)))
+}
+
+#[ensures(result == true)]
+fn mul_assoc(
+    x: Ed25519FieldElement, y: Ed25519FieldElement, z: Ed25519FieldElement
+) -> bool {
+    ((x * y) * z).is_eq(&(x * (y * z)))
+}
+
+#[ensures(result == true)]
+fn add_ident(x: Ed25519FieldElement) -> bool {
+    (x + Ed25519FieldElement::ZERO()).is_eq(&x)
+}
+
+#[ensures(result == true)]
+fn mul_ident(x: Ed25519FieldElement) -> bool {
+    (x * Ed25519FieldElement::ONE()).is_eq(&x)
+}
+
+#[ensures(result == true)]
+fn distrib(
+    x: Ed25519FieldElement, y: Ed25519FieldElement, z: Ed25519FieldElement
+) -> bool {
+    (x * (y + z)).is_eq(&(x * y + x * z))
+}
+
 // fn is_edwards25519(s: Int, t: Int) -> bool {
+// #[predicate]
 // fn is_edwards25519(x: Ed25519FieldElement, y: Ed25519FieldElement) -> bool {
 //     // (y * y) - (x * x) == Ed25519FieldElement::ONE() + (d * x * x * y * y)
 //     let lh = (y * y) - (x * x);
