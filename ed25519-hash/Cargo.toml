@@ -9,17 +9,9 @@ edition = "2021"
 path = "src/ed25519-hash.rs"
 
 [dependencies]
-hacspec-lib = { path = "../../hacspecfork/lib" }
-hacspec-sha512 = { path = "../../hacspecfork/examples/sha512" }
-hacspec-ed25519 = { path = "../../hacspecfork/examples/ed25519" }
-# hacspec-lib = { path = "../../hacspec/lib" }
-# hacspec-sha512 = { path = "../../hacspec/examples/sha512" }
-# hacspec-ed25519 = { path = "../../hacspec/examples/ed25519" }
-
-[dependencies.creusot-contracts]
-git = "https://github.com/xldenis/creusot/"
-branch = "master"
-package = "creusot-contracts"
+hacspec-lib = { path = "../../hacspec/lib" }
+hacspec-sha512 = { path = "../../hacspec/examples/sha512" }
+hacspec-ed25519 = { path = "../../hacspec/examples/ed25519" }
 
 [dev-dependencies]
 quickcheck = "1"
@@ -27,6 +19,4 @@ quickcheck_macros = "1"
 h2c-rust-ref = { git = "https://github.com/armfazh/h2c-rust-ref" }
 redox-ecc = { git = "https://github.com/armfazh/redox-ecc" }
 
-[features]
-contracts = []
 

@@ -9,7 +9,7 @@ edition = "2021"
 path = "src/pearlitefun.rs"
 
 [dependencies]
-hacspec-lib = { path = "../../hacspecfork/lib" }
+hacspec-lib = { path = "../../hacspec/lib" }
 
 [dependencies.creusot-contracts]
 git = "https://github.com/xldenis/creusot/"
