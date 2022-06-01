@@ -1,12 +1,14 @@
+// Cipher suite = RSA-FDH-VRF-SHA256
+// Based on section 4 of https://datatracker.ietf.org/doc/draft-irtf-cfrg-vrf/
+
 use hacspec_lib::*;
 use hacspec_sha256::*;
 use rsa::*;
 
-const SUITE_INT: usize = 4usize;
+const SUITE_INT: usize = 1usize;
 
 fn suite_string() -> ByteSeq { intbyte(SUITE_INT) }
 
-// VRF stuff ===================================================================
 // Note, only one byte is allowed
 fn intbyte(y: usize) -> ByteSeq {
     let mut x = RSAInt::ZERO();
@@ -16,6 +18,7 @@ fn intbyte(y: usize) -> ByteSeq {
     x.to_byte_seq_be().slice(31,1)
 }
 
+// MGF_salt currently part of cipher suite, could be optional input
 fn vrf_mgf1(n: RSAInt, alpha: &ByteSeq) -> ByteSeqResult {
     let mgf_domain_separator = intbyte(1);
 
@@ -30,12 +33,8 @@ fn vrf_mgf1(n: RSAInt, alpha: &ByteSeq) -> ByteSeqResult {
     ByteSeqResult::Ok(mgf)
 }
 
-// Cipher suite = RSA-FDH-VRF-SHA256
-// MGF_salt currently part of cipher suite, could be optional input
-// Input: Secret Key, alpha string in ByteSeq
-// Output: pi_string proof that beta was calculated correctly
 pub fn prove(sk: SK, alpha: &ByteSeq) -> ByteSeqResult {
-    let (n, _d) = sk;
+    let (n, _d) = sk.clone();
 
     // STEP 1 and 2
     let em = vrf_mgf1(n, alpha)?;
@@ -50,8 +49,6 @@ pub fn prove(sk: SK, alpha: &ByteSeq) -> ByteSeqResult {
     i2osp(s, BYTE_SIZE)
 }
 
-// Input: pi_string calculated in prove, or from verify
-// Output: beta_string
 pub fn proof_to_hash(pi_string: &ByteSeq) -> ByteSeqResult {
     // STEP 1
     let proof_to_hash_domain_separator = intbyte(2);
@@ -62,15 +59,11 @@ pub fn proof_to_hash(pi_string: &ByteSeq) -> ByteSeqResult {
         .concat(pi_string));
 
     // STEP 3
-    // sha256(&hash_string)
-    ByteSeqResult::Ok(sha256(&hash_string).slice(0,32))
+    ByteSeqResult:: Ok(sha256(&hash_string).slice(0,32))
 }
 
-// TODO check if we should include mgf_salt
-// Input: Private Key, alpha_string, pi_string
-// Output: Verified beta string
 pub fn verify(pk: PK, alpha: &ByteSeq, pi_string: &ByteSeq) -> ByteSeqResult {
-    let (n, _e) = pk;
+    let (n, _e) = pk.clone();
 
     // STEP 1
     let s = os2ip(pi_string);
@@ -85,39 +78,35 @@ pub fn verify(pk: PK, alpha: &ByteSeq, pi_string: &ByteSeq) -> ByteSeqResult {
     let m_prime = os2ip(&em_prime);
 
     // STEP 6
-    let mut result = ByteSeqResult::Err(Error::InvalidProof);
     if m == m_prime {
-        let output = proof_to_hash(pi_string)?;
-        result = ByteSeqResult::Ok(output)
+        proof_to_hash(pi_string)
+    } else {
+        ByteSeqResult::Err(Error::InvalidProof)
     }
-    result
 }
 
-// TESTING =====================================================================
 #[cfg(test)]
 extern crate quickcheck;
-
 #[cfg(test)]
 #[macro_use(quickcheck)]
 extern crate quickcheck_macros;
-
 #[cfg(test)]
 extern crate glass_pumpkin;
-
-#[cfg(test)]
-use num_bigint::{BigInt,Sign};
-
-#[cfg(test)]
-use glass_pumpkin::prime;
-
-#[cfg(test)]
-use quickcheck::*;
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-// KEYGEN ======================================================================
+    #[cfg(test)]
+    use num_bigint::{BigInt,Sign};
+
+    #[cfg(test)]
+    use glass_pumpkin::prime;
+
+    #[cfg(test)]
+    use quickcheck::*;
+
+    // RSA key generation
     // Taken from https://asecuritysite.com/rust/rsa01/ 
     fn modinv(a0: BigInt, m0: BigInt) -> BigInt {
         if m0 == one() {return one()}
@@ -148,7 +137,7 @@ mod tests {
         ((n, RSAInt::from(e)), (n, RSAInt::from(d)))
     }
 
-// QUICKCHECK ==================================================================
+    // quickcheck generation
     #[derive(Clone, Copy, Debug)]
     struct Keyp {n: RSAInt, d: RSAInt, e: RSAInt}
     #[derive(Clone, Copy, Debug)]
@@ -172,8 +161,7 @@ mod tests {
         }
     }
 
-// VRF TESTS ===================================================================
-
+    // tests
     #[quickcheck]
     #[ignore]
     fn rsafhdvrf(kp: Keyp, alpha: Wrapper) -> bool {
