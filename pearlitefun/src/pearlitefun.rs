@@ -51,6 +51,11 @@ public_nat_mod!(
     modulo_value: "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffed"
 );
 
+// abstract_public_modular_integer!(
+//     name: Something,
+//     n: 32
+// );
+
 // not possible in creusot
 // pub fn P3_8() -> SerializedScalar {
 //     SerializedScalar(secret_array!(
@@ -147,40 +152,14 @@ fn cmov(
 //     a + b == b
 // }
 
-// fn is_curve25519(s: Int, t: Int) -> bool {
-// #[trusted]
-// #[predicate]
-// pub fn is_curve25519(x: Ed25519FieldElement, y: Ed25519FieldElement) -> bool {
-//     // y * y == (x * x * x) + (Ed25519FieldElement::from_literal(486662) * x * x) + x
-//     let lh = y * y;
-//     // TODO fix missing numbers
-//     let rh = (x * x * x) + (x * x) + x;
-//     lh == rh
-// }
-
-// #[predicate]
-// pub fn mult(x: Ed25519FieldElement) -> bool {
-//     let lh = x * x;
-//     let rh = x * x;
-//     lh.is_eq(&rh)
-// }
-
-// #[predicate]
-// pub fn mult(x: u32) -> bool {
-//     let lh = x * x;
-//     let rh = x * x;
-//     lh == rh
-// }
-
-// #[ensures(mult(x) == true)]
-// pub fn mult_test(x: u32) -> u32 {
-//     x
-// }
-
 #[ensures(result == true)]
 fn add_commut(x: Ed25519FieldElement, y: Ed25519FieldElement) -> bool {
-    (x + y).is_eq(&(y + x))
+    (x + y + Ed25519FieldElement::ONE()).is_eq(&(y + x))
 }
+// #[ensures(result == true)]
+// fn add_commut2(x: Something, y: Something) -> bool {
+//     (x).is_eq(&(x))
+// }
 
 #[ensures(result == true)]
 fn mul_commut(x: Ed25519FieldElement, y: Ed25519FieldElement) -> bool {
@@ -225,6 +204,38 @@ fn distrib(
 //     let lh = (y * y) - (x * x);
 //     let rh = Ed25519FieldElement::ONE() + (d * x * x * y * y);
 //     lh == rh
+// }
+
+// fn is_curve25519(s: Int, t: Int) -> bool {
+// #[trusted]
+// #[predicate]
+// pub fn is_curve25519(x: Ed25519FieldElement, y: Ed25519FieldElement) -> bool {
+//     // y * y == (x * x * x) + (Ed25519FieldElement::from_literal(486662) * x * x) + x
+//     let lh = y * y;
+//     // TODO fix missing numbers
+//     let rh = (x * x * x) + (x * x) + x;
+//     lh == rh
+// }
+
+// #[predicate]
+// pub fn mult(x: Ed25519FieldElement) -> bool {
+//     pearlite! {
+//         let lh = x * x
+//         let rh = x * x
+//         lh == rh
+//     }
+// }
+
+// #[predicate]
+// pub fn mult(x: u32) -> bool {
+//     let lh = x * x;
+//     let rh = x * x;
+//     lh == rh
+// }
+
+// #[ensures(mult(x) == true)]
+// pub fn mult_test(x: u32) -> u32 {
+//     x
 // }
 
 // #[ensures(sum_one_hactrust(s, t))]
