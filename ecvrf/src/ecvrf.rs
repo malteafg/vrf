@@ -156,7 +156,6 @@ fn ecvrf_encode_to_curve_try_and_increment(
 
     let mut h: Option<EdPoint> = Option::<EdPoint>::None;
 
-    
     // TODO can we have while loops in hacspec?
     for ctr in 1..256 {
         // this h 'inexisting variable'? hacspec not happy

@@ -4,6 +4,7 @@ use hacspec_sha256::*;
 pub const BIT_SIZE: u32  = 1024u32;
 pub const BYTE_SIZE: u32 = 1024u32 / 8u32;
 const HLEN: usize = 32usize; // sha256 / 8 = 32
+
 unsigned_public_integer!(RSAInt, 1024);
 
 #[derive(Debug)]
@@ -83,11 +84,8 @@ pub fn rsavp1(pk: PK, s: RSAInt) -> RSAIntResult {
     }
 }
 
-
-// TESTING =====================================================================
 #[cfg(test)]
 extern crate quickcheck;
-
 #[cfg(test)]
 #[macro_use(quickcheck)]
 extern crate quickcheck_macros;
@@ -96,19 +94,19 @@ extern crate quickcheck_macros;
 extern crate glass_pumpkin;
 
 #[cfg(test)]
-use num_bigint::{BigInt,Sign};
-
-#[cfg(test)]
-use glass_pumpkin::prime;
-
-#[cfg(test)]
-use quickcheck::*;
-
-#[cfg(test)]
 mod tests {
     use super::*;
-
-// KEYGEN ======================================================================
+   
+    #[cfg(test)]
+    use num_bigint::{BigInt,Sign};
+    
+    #[cfg(test)]
+    use glass_pumpkin::prime;
+    
+    #[cfg(test)]
+    use quickcheck::*;
+ 
+    // RSA key generation
     // Taken from https://asecuritysite.com/rust/rsa01/ 
     fn modinv(a0: BigInt, m0: BigInt) -> BigInt {
         if m0 == one() {return one()}
@@ -139,7 +137,7 @@ mod tests {
         ((n, RSAInt::from(e)), (n, RSAInt::from(d)))
     }
 
-// QUICKCHECK ==================================================================
+    // quickcheck generation
     #[derive(Clone, Copy, Debug)]
     struct Keyp {n: RSAInt, d: RSAInt, e: RSAInt}
 
@@ -161,7 +159,7 @@ mod tests {
         }
     }
 
-// RSA TESTS ===================================================================
+    // tests
     #[quickcheck]
     fn i2os2i(x: RSAInt) -> bool {
         let s = i2osp(x, 128).unwrap();
