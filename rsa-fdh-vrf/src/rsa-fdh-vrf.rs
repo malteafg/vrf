@@ -20,10 +20,10 @@ fn intbyte(y: usize) -> ByteSeq {
 // MGF_salt currently part of cipher suite, could be optional input
 fn vrf_mgf1(n: RSAInt, alpha: &ByteSeq) -> ByteSeqResult {
     let mgf_domain_separator = intbyte(1);
-
     let mgf_salt1 = i2osp(RSAInt::from_literal(BYTE_SIZE as u128), 4u32)?;
     let mgf_salt2 = i2osp(n, BYTE_SIZE)?;
     let mgf_salt = mgf_salt1.concat(&mgf_salt2);
+
     let mgf_string = suite_string()
         .concat(&mgf_domain_separator
         .concat(&mgf_salt
