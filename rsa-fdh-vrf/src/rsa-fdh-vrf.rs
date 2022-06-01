@@ -6,7 +6,6 @@ use hacspec_sha256::*;
 use rsa::*;
 
 const SUITE_INT: usize = 1usize;
-
 fn suite_string() -> ByteSeq { intbyte(SUITE_INT) }
 
 // Note, only one byte is allowed
@@ -161,7 +160,6 @@ mod tests {
         }
     }
 
-    // tests
     #[quickcheck]
     #[ignore]
     fn rsafhdvrf(kp: Keyp, alpha: Wrapper) -> bool {
@@ -174,11 +172,11 @@ mod tests {
     
     #[quickcheck]
     #[ignore]
-    fn negrsafhdvrf(kp: Keyp, fake: Keyp, alpha: Wrapper) -> bool {
+    fn neg_rsafhdvrf(kp: Keyp, fake: Keyp, alpha: Wrapper) -> bool {
         let alpha = i2osp(alpha.0, BYTE_SIZE).unwrap();
         let pi = prove((kp.n, kp.d), &alpha).unwrap();
         match verify((fake.n, fake.e), &alpha, &pi) {
-            Ok(_beta_prime) => panic!(),
+            Ok(_beta_prime) => false,
             Err(e) => matches!(e, Error::InvalidProof 
                                 | Error::MessageTooLargeVerify),
         }
@@ -186,14 +184,14 @@ mod tests {
 
     #[quickcheck]
     #[ignore]
-    fn negalpharsafhdvrf(
+    fn neg_alpha_rsafhdvrf(
         kp: Keyp, alpha: Wrapper, fake_alpha: Wrapper
     ) -> bool {
         let alpha = i2osp(alpha.0, BYTE_SIZE).unwrap();
         let fake_alpha = i2osp(fake_alpha.0, BYTE_SIZE).unwrap();
         let pi = prove((kp.n, kp.d), &fake_alpha).unwrap();
         match verify((kp.n, kp.e), &alpha, &pi) {
-            Ok(_beta_prime) => panic!(),
+            Ok(_beta_prime) => false,
             Err(e) => matches!(e, Error::InvalidProof 
                                 | Error::MessageTooLargeVerify),
         }
