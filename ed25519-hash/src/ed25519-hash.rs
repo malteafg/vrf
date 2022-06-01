@@ -15,7 +15,6 @@ public_nat_mod!(
     type_of_canvas: EdFieldHashCanvas,
     bit_size_of_field: 512,
     modulo_value: "7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffed"
-    // modulo_value: "1000000000000000000000000000000014def9dea2f79cd65812631a5cf5d3ed"
 );
 
 // (p - 1) / 2
@@ -51,7 +50,6 @@ const P_5_8: ArrEd25519FieldElement = ArrEd25519FieldElement(secret_array!(
     ]
 ));
 
-// HASH-TO-FIELD ===============================================================
 // taken from bls12-381-hash.rs
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#section-5.4.1
 pub fn expand_message_xmd(
@@ -105,7 +103,6 @@ pub fn ed_hash_to_field(
     output
 }
 
-// AUXILIARY FUNCTIONS =========================================================
 // adapted from bls12-381-hash.rs
 fn ed_is_square(x: Ed25519FieldElement) -> bool {
     let c1 = Ed25519FieldElement::from_byte_seq_be(&P_1_2.to_be_bytes()); // (p - 1) / 2
@@ -150,7 +147,8 @@ fn xor(a: bool, b: bool) -> bool {
 }
 
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#appendix-D.1-13
-// NOTE: takes an EdPoint even though it converts a Curve25519 point
+// Adapted to multiply with sqrt(-486664), only use for Edwards25519
+// NOTE: Input EdPoint is actually a Curve25519 point
 pub fn monty_to_edw(p: EdPoint) -> EdPoint {
     let (s, t, _, _) = normalize(p);
     let one = Ed25519FieldElement::ONE();
@@ -166,30 +164,15 @@ pub fn monty_to_edw(p: EdPoint) -> EdPoint {
     let w = w * tv1;
     let e = tv2 == zero;
     let w = cmov(w, one, e);
-    // TODO no funnum
-    let funnum = Ed25519FieldElement::ZERO() - Ed25519FieldElement::from_literal(486664);
-    let sq = sqrt(funnum);
+    
+    let c = Ed25519FieldElement::ZERO() - Ed25519FieldElement::from_literal(486664u128);
+    let sq = sqrt(c);
     let v = v * sq.unwrap();
     
     (v, w, one, v * w)
 }
 
-// does not convert the identity point
-// NOTE: takes an EdPoint even though it converts a Curve25519 point
-fn fake_monty_to_edw(p: EdPoint) -> EdPoint {
-    let (s, t, _, _) = normalize(p);
-    let tinv = t.pow_self(Ed25519FieldElement::from_hex("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffeb"));
-    let one = Ed25519FieldElement::ONE();
-    let funnum = Ed25519FieldElement::ZERO() - Ed25519FieldElement::from_literal(486664);
-    let sq = sqrt(funnum);
-
-    let v = (s * tinv) * sq.unwrap();
-    let w = (s - one) * (s + one).inv();
-
-    (v, w, one, v * w)
-}
-
-// MAP-TO-CURVES ===============================================================
+// map-to-curves
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#section-6.7.1
 // NOTE: returns a curve25519 point, even though represented as EdPoint
 // non-straight
@@ -263,10 +246,9 @@ pub fn map_to_curve_elligator2_straight(u: Ed25519FieldElement) -> EdPoint {
 
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#name-curve25519-q-5-mod-8-k-1
 // NOTE: returns a curve25519 point, even though represented as EdPoint
-// OPTIMIZED
-fn map_to_curve_elligator2_curve25519(u: Ed25519FieldElement) -> EdPoint {
+// optimized
+pub fn map_to_curve_elligator2_curve25519(u: Ed25519FieldElement) -> EdPoint {
     let j = Ed25519FieldElement::from_literal(J);
-    let z = Ed25519FieldElement::from_literal(Z);
     let zero = Ed25519FieldElement::ZERO();
     let one = Ed25519FieldElement::ONE();
     let two = Ed25519FieldElement::TWO();
@@ -345,9 +327,9 @@ pub fn map_to_curve_elligator2_edwards25519(u: Ed25519FieldElement) -> EdPoint {
     (x, y, one, x * y)
 }
 
-// MAIN FUNCTIONS ==============================================================
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#section-6.8.2
 pub fn map_to_curve_elligator2_edwards(u: Ed25519FieldElement) -> EdPoint {
+    // map_to_curve_elligator2_straight(u) can be used instead
     let st = map_to_curve_elligator2(u);
     monty_to_edw(st)
 }
@@ -355,28 +337,27 @@ pub fn map_to_curve_elligator2_edwards(u: Ed25519FieldElement) -> EdPoint {
 //  https://www.ietf.org/archive/id/draft-irtf-cfrg-hash-to-curve-13.html#section-3
 pub fn ed_encode_to_curve(msg: &ByteSeq, dst: &ByteSeq) -> EdPoint {
     let u = ed_hash_to_field(msg, dst, 1);
-    // let q = map_to_curve_elligator2_edwards(u[0]);
-    let q = map_to_curve_elligator2_edwards25519(u[0]);
-    let p = ed_clear_cofactor(q);
-    p
+    // map_to_curve_elligator2_edwards25519(u[0]) can be used instead
+    let q = map_to_curve_elligator2_edwards(u[0]);
+    ed_clear_cofactor(q)
 }
 
-// TESTING =====================================================================
+// testing
 #[cfg(test)]
 extern crate quickcheck;
-
 #[cfg(test)]
 #[macro_use(quickcheck)]
 extern crate quickcheck_macros;
 
-#[cfg(test)]
-use quickcheck::*;
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-// QUICKCHECK ==================================================================
+    #[cfg(test)]
+    use quickcheck::*;
+    
+    // quickcheck generation
     #[derive(Clone, Debug)]
     struct Wrapper(ByteSeq);
 
@@ -393,7 +374,6 @@ mod tests {
 
 // Hash to curve tests =========================================================
     #[quickcheck]
-    // #[ignore]
     fn point_on_curve(msg: Wrapper) -> bool {
         let dst = ByteSeq::from_public_slice(
             b"ECVRF_edwards25519_XMD:SHA-512_ELL2_NU_");
@@ -410,7 +390,6 @@ mod tests {
     }
 
     #[quickcheck]
-    // #[ignore]
     fn no_collision(msg1: Wrapper, msg2: Wrapper) -> bool {
         let dst = ByteSeq::from_public_slice(
             b"ECVRF_edwards25519_XMD:SHA-512_ELL2_NU_");
@@ -433,7 +412,6 @@ mod tests {
     }
     
     #[quickcheck]
-    #[ignore]
     fn rational_map_point_on_curve(msg: Wrapper) -> bool {
         let dst = ByteSeq::from_public_slice(
             b"ECVRF_edwards25519_XMD:SHA-512_ELL2_NU_");
@@ -450,19 +428,6 @@ mod tests {
         let lh = (y * y) - (x * x);
         let rh = Ed25519FieldElement::ONE() + (d * x * x * y * y);
         lh == rh
-    }
-
-    #[quickcheck]
-    fn monty_equals(msg: Wrapper) -> bool {
-        let dst = ByteSeq::from_public_slice(
-            b"ECVRF_edwards25519_XMD:SHA-512_ELL2_NU_");
-        let dst = dst.concat(&ByteSeq::from_hex("04"));
-        let u = ed_hash_to_field(&msg.0, &dst, 1);
-        let st = map_to_curve_elligator2_straight(u[0]);
-
-        let point = monty_to_edw(st);
-        let fake = fake_monty_to_edw(st);
-        point == fake
     }
 
     #[test]

@@ -10,7 +10,6 @@ extern crate quickcheck;
 extern crate quickcheck_macros;
 
 #[quickcheck]
-// #[ignore]
 fn test_equiv_armfazh(msg: String) -> bool {
     let dst = b"QUUX-V01-CS02-with-edwards25519_XMD:SHA-512_ELL2_NU_";
     let msg: &[u8] = msg.as_bytes();
@@ -46,7 +45,6 @@ fn test_equiv_armfazh(msg: String) -> bool {
     let poptim = ed_clear_cofactor(q);
     let poptim = normalize(poptim);
 
-    // normalize
     (parmfazh == poptim) & 
     (parmfazh == pstraight) & 
     (parmfazh == pnormal) &
