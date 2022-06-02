@@ -18,6 +18,24 @@ pub enum Errorec {
 pub type ByteSeqResult = Result<ByteSeq, Errorec>;
 pub type ProofResult = Result<(EdPoint, Scalar, Scalar), Errorec>;
 
+public_nat_mod!(
+    type_name: LargeMod,
+    type_of_canvas: LargeModCanvas,
+    bit_size_of_field: 256,
+    modulo_value: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+);
+
+array!(ArrLargeMod, 4, U64);
+const Q: ArrLargeMod = ArrLargeMod(secret_array!(
+    U64,
+    [
+        0x7fffffffffffffffu64,
+        0xffffffffffffffffu64,
+        0xffffffffffffffffu64,
+        0xffffffffffffffedu64
+    ]
+));
+
 const C_LEN: usize = 16usize;
 const PT_LEN: usize = 32usize;
 const Q_LEN: usize = 32usize;
@@ -51,9 +69,9 @@ const H2C_SUITE_ID_STRING: DST = DST(secret_array!(
     ]
 ));
 
-// See section 5.4.1 for ciphersuite 3
-// Note that this should not be used when alpha should remain secret
-// Panics occasionally with very low probability
+// // See section 5.4.1 for ciphersuite 3
+// // Note that this should not be used when alpha should remain secret
+// // Panics occasionally with very low probability
 // fn ecvrf_encode_to_curve_try_and_increment(
 //     encode_to_curve_salt: &ByteSeq, alpha: &ByteSeq
 // ) -> EdPoint {
@@ -73,7 +91,8 @@ const H2C_SUITE_ID_STRING: DST = DST(secret_array!(
 //     let h = h.unwrap();
 //     point_mul_by_cofactor(h)
 // }
-//// Note, only one byte is allowed
+
+// // Note, only one byte is allowed
 // fn intbyte(y: usize) -> ByteSeq {
 //     let mut x = Ed25519FieldElement::ZERO();
 //     for _ctr in 0..y {
@@ -134,15 +153,19 @@ fn ecvrf_decode_proof(pi: &ByteSeq) -> ProofResult {
                 .ok_or(Errorec::InvalidProof)?;
 
     let c = Scalar::from_byte_seq_le(c_string.concat(&ByteSeq::new(16)));
-    let s = Scalar::from_byte_seq_le(s_string);
-    // This is definitely wrong see step 8 of decode proof
-    // TODO check if s (before mod q) is bigger than q
+    let s = Scalar::from_byte_seq_le(s_string.clone());
 
-    ProofResult::Ok((gamma, c, s))
+    let s_test = LargeMod::from_byte_seq_le(s_string);
+    let q = LargeMod::from_byte_seq_be(&Q.to_be_bytes());
+    if s_test > q {
+        ProofResult::Err(Errorec::InvalidProof)
+    } else {
+        ProofResult::Ok((gamma, c, s))
+    }
 }
 
-pub type BoolResult = Result<bool, Errorec>;
 // See section 5.4.5
+pub type BoolResult = Result<bool, Errorec>;
 fn ecvrf_validate_key(y: PublicKey) -> BoolResult {
     let y = decompress(y).ok_or(Errorec::InvalidPublicKey)?;
     let y_prime = point_mul_by_cofactor(y);
