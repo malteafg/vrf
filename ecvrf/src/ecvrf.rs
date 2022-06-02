@@ -17,25 +17,39 @@ pub enum Errorec {
 
 pub type ByteSeqResult = Result<ByteSeq, Errorec>;
 pub type ProofResult = Result<(EdPoint, Scalar, Scalar), Errorec>;
-// TODO a bit weird to use a bool result
-pub type BoolResult = Result<bool, Errorec>;
 
-// These three are defined by the ECVRF-EDWARDS25519-SHA512-TAI suite
 const C_LEN: usize = 16usize;
 const PT_LEN: usize = 32usize;
 const Q_LEN: usize = 32usize;
 
-const SUITE_INT: usize = 4usize;
-fn suite_string() -> ByteSeq { intbyte(SUITE_INT) }
+bytes!(IntByte, 1);
+#[rustfmt::skip]
+const ZERO: IntByte = IntByte(secret_array!(U8,  [0x00u8]));
+#[rustfmt::skip]
+const ONE: IntByte = IntByte(secret_array!(U8,  [0x01u8]));
+#[rustfmt::skip]
+const TWO: IntByte = IntByte(secret_array!(U8,  [0x02u8]));
+#[rustfmt::skip]
+const THREE: IntByte = IntByte(secret_array!(U8,  [0x03u8]));
+#[rustfmt::skip]
+const FOUR: IntByte = IntByte(secret_array!(U8,  [0x04u8]));
 
-// Note, only one byte is allowed
-fn intbyte(y: usize) -> ByteSeq {
-    let mut x = Ed25519FieldElement::ZERO();
-    for _ctr in 0..y {
-        x = x + Ed25519FieldElement::ONE();
-    }
-    x.to_byte_seq_be().slice(31,1)
-}
+const SUITE_STRING: IntByte = FOUR;
+
+bytes!(DST, 39);
+#[rustfmt::skip]
+// "ECVRF_edwards25519_XMD:SHA-512_ELL2_NU_"
+const H2C_SUITE_ID_STRING: DST = DST(secret_array!(
+    U8, 
+    [
+        0x45u8, 0x43u8, 0x56u8, 0x52u8, 0x46u8, 0x5fu8,
+        0x65u8, 0x64u8, 0x77u8, 0x61u8, 0x72u8, 0x64u8, 0x73u8, 0x32u8, 
+        0x35u8, 0x35u8, 0x31u8, 0x39u8, 0x5fu8, 0x58u8, 0x4du8, 0x44u8, 
+        0x3au8, 0x53u8, 0x48u8, 0x41u8, 0x2du8, 0x35u8, 0x31u8, 0x32u8, 
+        0x5fu8, 0x45u8, 0x4cu8, 0x4cu8, 0x32u8, 0x5fu8, 0x4eu8, 0x55u8 ,
+        0x5fu8
+    ]
+));
 
 // See section 5.4.1 for ciphersuite 3
 // Note that this should not be used when alpha should remain secret
@@ -43,24 +57,29 @@ fn intbyte(y: usize) -> ByteSeq {
 // fn ecvrf_encode_to_curve_try_and_increment(
 //     encode_to_curve_salt: &ByteSeq, alpha: &ByteSeq
 // ) -> EdPoint {
-//     let encode_to_curve_domain_separator_front = intbyte(1);
-//     let encode_to_curve_domain_separator_back = intbyte(0);
-
 //     let mut h: Option<EdPoint> = Option::<EdPoint>::None;
 //     for ctr in 1..256 {
 //         if h == Option::<EdPoint>::None {
 //             let ctr_string = intbyte(ctr-1);
-//             let hash_string = sha512(&suite_string()
-//                 .concat(&encode_to_curve_domain_separator_front)
+//             let hash_string = sha512(&SUITE_STRING
+//                 .concat(&ONE)
 //                 .concat(encode_to_curve_salt)
 //                 .concat(alpha)
 //                 .concat(&ctr_string)
-//                 .concat(&encode_to_curve_domain_separator_back));
+//                 .concat(&ZERO));
 //             h = decompress(CompressedEdPoint::from_slice(&hash_string, 0, 32));
 //         }
 //     }
 //     let h = h.unwrap();
 //     point_mul_by_cofactor(h)
+// }
+//// Note, only one byte is allowed
+// fn intbyte(y: usize) -> ByteSeq {
+//     let mut x = Ed25519FieldElement::ZERO();
+//     for _ctr in 0..y {
+//         x = x + Ed25519FieldElement::ONE();
+//     }
+//     x.to_byte_seq_be().slice(31,1)
 // }
 
 // See section 5.4.1.2
@@ -68,11 +87,7 @@ fn ecvrf_encode_to_curve_h2c_suite(
     encode_to_curve_salt: &ByteSeq, alpha: &ByteSeq
 ) -> EdPoint {
     let string_to_be_hashed = encode_to_curve_salt.concat(alpha);
-    // TODO Faked, fix later:
-    //let ecvrfstr = ByteSeq::from_public_slice(b"ECVRF_");
-    //let h2c_suite_id_string = ByteSeq::from_public_slice(b"edwards25519_XMD:SHA-512_ELL2_NU_");
-    //let dst = ecvrfstr.concat(&h2c_suite_id_string).concat(&suite_string());
-    let dst = suite_string();
+    let dst = H2C_SUITE_ID_STRING.concat(&SUITE_STRING);
     ed_encode_to_curve(&string_to_be_hashed, &dst)
 }
 
@@ -96,16 +111,14 @@ fn ecvrf_nonce_generation(
 fn ecvrf_challenge_generation(
     p1: EdPoint, p2: EdPoint, p3: EdPoint, p4: EdPoint, p5: EdPoint
 ) -> Scalar {
-    let challenge_generation_domain_separator_front = intbyte(2);
-    let challenge_generation_domain_separator_back = intbyte(0);
-    let string = suite_string()
-        .concat(&challenge_generation_domain_separator_front)
+    let string = SUITE_STRING
+        .concat(&TWO)
         .concat(&encode(p1))
         .concat(&encode(p2))
         .concat(&encode(p3))
         .concat(&encode(p4))
         .concat(&encode(p5))
-        .concat(&challenge_generation_domain_separator_back);
+        .concat(&ZERO);
 
     let c_string = sha512(&string);
     let truncated_c_string= c_string.slice(0, C_LEN).concat(&ByteSeq::new(16));    
@@ -128,6 +141,7 @@ fn ecvrf_decode_proof(pi: &ByteSeq) -> ProofResult {
     ProofResult::Ok((gamma, c, s))
 }
 
+pub type BoolResult = Result<bool, Errorec>;
 // See section 5.4.5
 fn ecvrf_validate_key(y: PublicKey) -> BoolResult {
     let y = decompress(y).ok_or(Errorec::InvalidPublicKey)?;
@@ -181,16 +195,12 @@ pub fn ecvrf_prove(
 pub fn ecvrf_proof_to_hash(pi: &ByteSeq) -> ByteSeqResult {
     // STEP 1, 2 and 3
     let (gamma, _, _) = ecvrf_decode_proof(pi)?;
-    
-    // STEP 4 + 5
-    let proof_to_hash_domain_separator_front = intbyte(3);
-    let proof_to_hash_domain_separator_back = intbyte(0);
 
-    // STEP 6
-    ByteSeqResult::Ok(sha512(&suite_string()
-        .concat(&proof_to_hash_domain_separator_front)
+    // STEP 4 + 5 + 6
+    ByteSeqResult::Ok(sha512(&SUITE_STRING
+        .concat(&THREE)
         .concat(&encode(point_mul_by_cofactor(gamma)))
-        .concat(&proof_to_hash_domain_separator_back)).slice(0,64))
+        .concat(&ZERO)).slice(0,64))
 }
 
 pub fn ecvrf_verify(

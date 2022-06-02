@@ -154,12 +154,8 @@
 
 // #[ensures(result == true)]
 // fn add_commut(x: Ed25519FieldElement, y: Ed25519FieldElement) -> bool {
-//     (x + y + Ed25519FieldElement::ONE()).is_eq(&(y + x))
+//     (x + y).is_eq(&(y + x))
 // }
-// // #[ensures(result == true)]
-// // fn add_commut2(x: Something, y: Something) -> bool {
-// //     (x).is_eq(&(x))
-// // }
 
 // #[ensures(result == true)]
 // fn mul_commut(x: Ed25519FieldElement, y: Ed25519FieldElement) -> bool {
@@ -257,8 +253,9 @@
 //     let w = w * tv1;
 //     let e = tv2.is_eq(&zero);
 //     let w = cmov(w, one, e);
-//     let funnum = zero - Ed25519FieldElement::from_literal(486664);
-//     let sq = sqrt(funnum);
+
+//     let c = zero - Ed25519FieldElement::from_literal(486664);
+//     let sq = sqrt(c);
 //     let v = v * sq.unwrap();
     
 //     (v, w)

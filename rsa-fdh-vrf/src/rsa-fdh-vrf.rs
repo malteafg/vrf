@@ -5,29 +5,25 @@ use hacspec_lib::*;
 use hacspec_sha256::*;
 use rsa::*;
 
-const SUITE_INT: usize = 1usize;
-fn suite_string() -> ByteSeq { intbyte(SUITE_INT) }
+bytes!(IntByte, 1);
 
-// Note, only one byte is allowed
-fn intbyte(y: usize) -> ByteSeq {
-    let mut x = RSAInt::ZERO();
-    for _ctr in 0..y {
-        x = x.add_mod(RSAInt::ONE(), RSAInt::from_literal(256u128));
-    }
-    x.to_byte_seq_be().slice(31,1)
-}
+#[rustfmt::skip]
+const ONE: IntByte = IntByte(secret_array!(U8,  [0x01u8]));
+#[rustfmt::skip]
+const TWO: IntByte = IntByte(secret_array!(U8,  [0x02u8]));
+
+const SUITE_STRING: IntByte = ONE;
 
 // MGF_salt currently part of cipher suite, could be optional input
 fn vrf_mgf1(n: RSAInt, alpha: &ByteSeq) -> ByteSeqResult {
-    let mgf_domain_separator = intbyte(1);
     let mgf_salt1 = i2osp(RSAInt::from_literal(BYTE_SIZE as u128), 4u32)?;
     let mgf_salt2 = i2osp(n, BYTE_SIZE)?;
     let mgf_salt = mgf_salt1.concat(&mgf_salt2);
 
-    let mgf_string = suite_string()
-        .concat(&mgf_domain_separator
-        .concat(&mgf_salt
-        .concat(alpha)));
+    let mgf_string = SUITE_STRING
+        .concat(&ONE)
+        .concat(&mgf_salt)
+        .concat(alpha);
     let mgf = mgf1(&mgf_string, BYTE_SIZE as usize - 1usize)?;
     ByteSeqResult::Ok(mgf)
 }
@@ -49,13 +45,8 @@ pub fn prove(sk: SK, alpha: &ByteSeq) -> ByteSeqResult {
 }
 
 pub fn proof_to_hash(pi_string: &ByteSeq) -> ByteSeqResult {
-    // STEP 1
-    let proof_to_hash_domain_separator = intbyte(2);
-
-    // STEP 2
-    let hash_string = suite_string()
-        .concat(&proof_to_hash_domain_separator
-        .concat(pi_string));
+    // STEP 1 + 2
+    let hash_string = SUITE_STRING.concat(&TWO.concat(pi_string));
 
     // STEP 3
     ByteSeqResult:: Ok(sha256(&hash_string).slice(0,32))
