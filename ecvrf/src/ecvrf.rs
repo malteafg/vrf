@@ -76,9 +76,10 @@ fn ecvrf_encode_to_curve_try_and_increment(
     encode_to_curve_salt: &ByteSeq, alpha: &ByteSeq
 ) -> EdPoint {
     let mut h: Option<EdPoint> = Option::<EdPoint>::None;
+    let mut x = Ed25519FieldElement::ZERO();
     for ctr in 1..256 {
         if h.clone() == Option::<EdPoint>::None {
-            let ctr_string = intbyte(ctr-1);
+            let ctr_string = x.to_byte_seq_be().slice(31,1);
             let hash_string = sha512(&SUITE_STRING
                 .concat(&ONE)
                 .concat(encode_to_curve_salt)
@@ -86,19 +87,11 @@ fn ecvrf_encode_to_curve_try_and_increment(
                 .concat(&ctr_string)
                 .concat(&ZERO));
             h = decompress(CompressedEdPoint::from_slice(&hash_string, 0, 32));
+            x = x + Ed25519FieldElement::ONE();
         }
     }
     let h = h.unwrap();
     point_mul_by_cofactor(h)
-}
-
-// Note, only one byte is allowed
-fn intbyte(y: usize) -> ByteSeq {
-    let mut x = Ed25519FieldElement::ZERO();
-    for _ctr in 0..y {
-        x = x + Ed25519FieldElement::ONE();
-    }
-    x.to_byte_seq_be().slice(31,1)
 }
 
 // See section 5.4.1.2
