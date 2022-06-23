@@ -13,7 +13,7 @@ hacspec-lib = { path = "../../hacspec/lib" }
 
 [dependencies.creusot-contracts]
 git = "https://github.com/xldenis/creusot/"
-branch = "master"
+branch = "bigint"
 package = "creusot-contracts"
 
 [features]
