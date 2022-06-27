@@ -132,6 +132,11 @@ fn cmov(
 }
 
 #[ensures(result == true)]
+fn add_ident(x: Ed25519FieldElement) -> bool {
+    (x + Ed25519FieldElement::ZERO()).is_eq(&x)
+}
+
+#[ensures(result == true)]
 fn add_commut(x: Ed25519FieldElement, y: Ed25519FieldElement) -> bool {
     (x + y).is_eq(&(y + x))
 }
@@ -185,11 +190,6 @@ fn mul_commut(x: Ed25519FieldElement, y: Ed25519FieldElement) -> bool {
 //     x: Ed25519FieldElement, y: Ed25519FieldElement, z: Ed25519FieldElement
 // ) -> bool {
 //     ((x * y) * z).is_eq(&(x * (y * z)))
-// }
-
-// #[ensures(result == true)]
-// fn add_ident(x: Ed25519FieldElement) -> bool {
-//     (x + Ed25519FieldElement::ZERO()).is_eq(&x)
 // }
 
 // #[ensures(result == true)]
